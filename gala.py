@@ -116,7 +116,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
             let currentIndex = 0;
 
             // Random navigation state
-            let remainingItems = [...Array(items.length).keys()]; // [0, 1, 2, ...]
+            let remainingItems = [...Array(items.length).keys()];
             let viewedItems = new Set();
 
             // Intersection observer for tracking current item
@@ -135,12 +135,20 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
             // Find closest item to center of viewport
             function findClosestToCenter() {{
                 const center = innerHeight / 2;
-                let closest = null, minDist = Infinity;
+                let closest = null;
+                let minDistance = Infinity;
+
                 items.forEach(item => {{
                     const rect = item.getBoundingClientRect();
-                    const dist = Math.abs(rect.top + rect.height / 2 - center);
-                    if (dist < minDist) {{ minDist = dist; closest = item; }}
+                    const itemCenter = rect.top + rect.height / 2;
+                    const distance = Math.abs(itemCenter - center);
+
+                    if (distance < minDistance) {{
+                        minDistance = distance;
+                        closest = item;
+                    }}
                 }});
+
                 return closest;
             }}
 
@@ -148,26 +156,30 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
             function navigateToRandom() {{
                 if (items.length === 0) return;
 
-                // If all items have been viewed, reset the cycle
+                // Reset cycle if all items have been viewed
                 if (remainingItems.length === 0) {{
                     remainingItems = [...Array(items.length).keys()];
                     viewedItems.clear();
                     console.log('All items viewed, restarting cycle');
                 }}
 
-                // Remove current item from remaining items if it exists
+                // Mark current item as viewed and remove from remaining
                 const currentInRemaining = remainingItems.indexOf(currentIndex);
                 if (currentInRemaining !== -1) {{
                     remainingItems.splice(currentInRemaining, 1);
                     viewedItems.add(currentIndex);
                 }}
 
-                // Pick a random item from remaining items
+                // Navigate to random unviewed item
                 if (remainingItems.length > 0) {{
                     const randomIndex = Math.floor(Math.random() * remainingItems.length);
                     const targetIndex = remainingItems[randomIndex];
 
-                    items[targetIndex].scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                    items[targetIndex].scrollIntoView({{
+                        behavior: 'smooth',
+                        block: 'start'
+                    }});
+
                     console.log(`Navigating to random item ${{targetIndex + 1}} of ${{items.length}}`);
                 }}
             }}
@@ -175,40 +187,59 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
             // Sequential navigation functions
             function navigateToNext() {{
                 if (items.length === 0) return;
+
                 const nextIndex = (currentIndex + 1) % items.length;
-                items[nextIndex].scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                items[nextIndex].scrollIntoView({{
+                    behavior: 'smooth',
+                    block: 'start'
+                }});
             }}
 
             function navigateToPrevious() {{
                 if (items.length === 0) return;
+
                 const prevIndex = (currentIndex - 1 + items.length) % items.length;
-                items[prevIndex].scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                items[prevIndex].scrollIntoView({{
+                    behavior: 'smooth',
+                    block: 'start'
+                }});
             }}
 
             // Delete current item
             async function deleteCurrent() {{
                 if (!current) return;
+
                 const filename = current.getAttribute('data-filename');
                 if (!filename) return;
 
                 console.log('Deleting:', filename);
 
                 try {{
-                    const response = await fetch('/api/delete?name=' + encodeURIComponent(filename), {{ method: 'DELETE' }});
+                    const response = await fetch('/api/delete?name=' + encodeURIComponent(filename), {{
+                        method: 'DELETE'
+                    }});
+
                     const data = await response.json().catch(() => ({{}}));
 
                     if (!response.ok || !data.ok) {{
-                        alert('Delete failed' + (data.error ? ': ' + data.error : ''));
+                        const errorMessage = data.error ? ': ' + data.error : '';
+                        alert('Delete failed' + errorMessage);
                         return;
                     }}
 
+                    // Clean up video resources
                     const video = current.querySelector('video');
                     if (video) {{
-                        try {{ video.pause(); video.src = ''; }} catch (e) {{}}
+                        try {{
+                            video.pause();
+                            video.src = '';
+                        }} catch (e) {{}}
                     }}
 
+                    // Remove item from DOM and tracking
                     observer.unobserve(current);
                     current.remove();
+
                     const removedIndex = items.indexOf(current);
                     if (removedIndex !== -1) {{
                         items.splice(removedIndex, 1);
@@ -218,10 +249,12 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                             .map(idx => idx > removedIndex ? idx - 1 : idx)
                             .filter(idx => idx !== removedIndex);
 
+                        // Update viewed items set
                         const newViewedItems = new Set();
                         viewedItems.forEach(idx => {{
                             if (idx !== removedIndex) {{
-                                newViewedItems.add(idx > removedIndex ? idx - 1 : idx);
+                                const adjustedIndex = idx > removedIndex ? idx - 1 : idx;
+                                newViewedItems.add(adjustedIndex);
                             }}
                         }});
                         viewedItems = newViewedItems;
@@ -231,7 +264,11 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                     if (items.length > 0) {{
                         const target = findClosestToCenter();
                         if (target) {{
-                            target.scrollIntoView({{ behavior: 'instant', block: 'start' }});
+                            target.scrollIntoView({{
+                                behavior: 'instant',
+                                block: 'start'
+                            }});
+
                             current = target;
                             currentIndex = items.indexOf(target);
                             console.log('Current image:', current.getAttribute('data-filename'));
@@ -246,18 +283,25 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
 
             // Keyboard event handlers
             document.addEventListener('keydown', e => {{
-                if (e.key === 'x' || e.key === 'X') {{
-                    e.preventDefault();
-                    deleteCurrent();
-                }} else if (e.key === 'j' || e.key === 'J') {{
-                    e.preventDefault();
-                    navigateToNext();
-                }} else if (e.key === 'k' || e.key === 'K') {{
-                    e.preventDefault();
-                    navigateToPrevious();
-                }} else if (e.key === 'n' || e.key === 'N') {{
-                    e.preventDefault();
-                    navigateToRandom();
+                const key = e.key.toLowerCase();
+
+                switch (key) {{
+                    case 'x':
+                        e.preventDefault();
+                        deleteCurrent();
+                        break;
+                    case 'j':
+                        e.preventDefault();
+                        navigateToNext();
+                        break;
+                    case 'k':
+                        e.preventDefault();
+                        navigateToPrevious();
+                        break;
+                    case 'n':
+                        e.preventDefault();
+                        navigateToRandom();
+                        break;
                 }}
             }});
         }})();
