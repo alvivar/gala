@@ -114,13 +114,11 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
             let items = Array.from(document.querySelectorAll('.item'));
             let current = items[0] || null;
             let currentIndex = 0;
+            let history = [];
 
             // Random navigation state
             let remainingItems = [...Array(items.length).keys()];
             let viewedItems = new Set();
-
-            // History for backward navigation
-            let history = [];
 
             // Intersection observer for tracking current item
             const observer = new IntersectionObserver(entries => {{
@@ -135,7 +133,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
 
             items.forEach(item => observer.observe(item));
 
-            // Find closest item to center of viewport
+            // Utility functions
             function findClosestToCenter() {{
                 const center = innerHeight / 2;
                 let closest = null;
@@ -155,7 +153,6 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 return closest;
             }}
 
-            // Navigation helper to add to history
             function navigateToIndex(targetIndex, addToHistory = true) {{
                 if (addToHistory && currentIndex !== targetIndex) {{
                     history.push(currentIndex);
@@ -167,7 +164,21 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 }});
             }}
 
-            // Random navigation functions
+            // Navigation functions
+            function navigateToNext() {{
+                if (items.length === 0) return;
+
+                const nextIndex = (currentIndex + 1) % items.length;
+                navigateToIndex(nextIndex);
+            }}
+
+            function navigateToPrevious() {{
+                if (items.length === 0) return;
+
+                const prevIndex = (currentIndex - 1 + items.length) % items.length;
+                navigateToIndex(prevIndex);
+            }}
+
             function navigateToRandom() {{
                 if (items.length === 0) return;
 
@@ -196,30 +207,14 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 }}
             }}
 
-            // Sequential navigation functions
-            function navigateToNext() {{
-                if (items.length === 0) return;
-
-                const nextIndex = (currentIndex + 1) % items.length;
-                navigateToIndex(nextIndex);
-            }}
-
-            function navigateToPrevious() {{
-                if (items.length === 0) return;
-
-                const prevIndex = (currentIndex - 1 + items.length) % items.length;
-                navigateToIndex(prevIndex);
-            }}
-
-            // Backward navigation through history
             function navigateBackward() {{
                 if (history.length === 0) return;
 
                 const previousIndex = history.pop();
-                navigateToIndex(previousIndex, false); // Don't add to history when going back
+                navigateToIndex(previousIndex, false);
             }}
 
-            // Delete current item
+            // Delete functionality
             async function deleteCurrent() {{
                 if (!current) return;
 
