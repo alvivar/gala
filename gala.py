@@ -119,6 +119,9 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
             let remainingItems = [...Array(items.length).keys()];
             let viewedItems = new Set();
 
+            // History for backward navigation
+            let history = [];
+
             // Intersection observer for tracking current item
             const observer = new IntersectionObserver(entries => {{
                 for (const entry of entries) {{
@@ -152,6 +155,18 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 return closest;
             }}
 
+            // Navigation helper to add to history
+            function navigateToIndex(targetIndex, addToHistory = true) {{
+                if (addToHistory && currentIndex !== targetIndex) {{
+                    history.push(currentIndex);
+                }}
+
+                items[targetIndex].scrollIntoView({{
+                    behavior: 'smooth',
+                    block: 'start'
+                }});
+            }}
+
             // Random navigation functions
             function navigateToRandom() {{
                 if (items.length === 0) return;
@@ -175,10 +190,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                     const randomIndex = Math.floor(Math.random() * remainingItems.length);
                     const targetIndex = remainingItems[randomIndex];
 
-                    items[targetIndex].scrollIntoView({{
-                        behavior: 'smooth',
-                        block: 'start'
-                    }});
+                    navigateToIndex(targetIndex);
 
                     console.log(`Navigating to random item ${{targetIndex + 1}} of ${{items.length}}`);
                 }}
@@ -189,20 +201,22 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 if (items.length === 0) return;
 
                 const nextIndex = (currentIndex + 1) % items.length;
-                items[nextIndex].scrollIntoView({{
-                    behavior: 'smooth',
-                    block: 'start'
-                }});
+                navigateToIndex(nextIndex);
             }}
 
             function navigateToPrevious() {{
                 if (items.length === 0) return;
 
                 const prevIndex = (currentIndex - 1 + items.length) % items.length;
-                items[prevIndex].scrollIntoView({{
-                    behavior: 'smooth',
-                    block: 'start'
-                }});
+                navigateToIndex(prevIndex);
+            }}
+
+            // Backward navigation through history
+            function navigateBackward() {{
+                if (history.length === 0) return;
+
+                const previousIndex = history.pop();
+                navigateToIndex(previousIndex, false); // Don't add to history when going back
             }}
 
             // Delete current item
@@ -258,6 +272,11 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                             }}
                         }});
                         viewedItems = newViewedItems;
+
+                        // Update history to adjust indices after deletion
+                        history = history
+                            .map(idx => idx > removedIndex ? idx - 1 : idx)
+                            .filter(idx => idx !== removedIndex);
                     }}
 
                     // Navigate to next item or show empty state
@@ -301,6 +320,10 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                     case 'n':
                         e.preventDefault();
                         navigateToRandom();
+                        break;
+                    case 'b':
+                        e.preventDefault();
+                        navigateBackward();
                         break;
                 }}
             }});
