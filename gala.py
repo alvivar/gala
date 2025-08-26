@@ -120,20 +120,35 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
             let remainingItems = [...Array(items.length).keys()];
             let viewedItems = new Set();
 
-            // Intersection observer for tracking current item
+            // Initialize intersection observer for tracking current item
             const observer = new IntersectionObserver(entries => {{
-                for (const entry of entries) {{
+                entries.forEach(entry => {{
+                    const video = entry.target.querySelector('video');
+
                     if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {{
+                        // Update current item tracking
                         current = entry.target;
                         currentIndex = items.indexOf(entry.target);
                         console.log('Current image:', current.getAttribute('data-filename'));
+
+                        // Auto-play videos when they enter view
+                        if (video) {{
+                            video.play();
+                        }}
+                    }} else {{
+                        // Auto-pause and mute videos when out of sight
+                        if (video && !video.paused) {{
+                            video.pause();
+                            video.muted = true;
+                        }}
                     }}
-                }}
+                }});
             }}, {{ threshold: [0, 0.6, 1] }});
 
+            // Start observing all items
             items.forEach(item => observer.observe(item));
 
-            // Utility functions
+            // Utility Functions
             function findClosestToCenter() {{
                 const center = innerHeight / 2;
                 let closest = null;
@@ -164,7 +179,21 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 }});
             }}
 
-            // Navigation functions
+            // Video Controls
+            function toggleCurrentVideo() {{
+                if (!current) return;
+
+                const video = current.querySelector('video');
+                if (!video) return;
+
+                if (video.paused) {{
+                    video.play();
+                }} else {{
+                    video.pause();
+                }}
+            }}
+
+            // Navigation Functions
             function navigateToNext() {{
                 if (items.length === 0) return;
 
@@ -189,7 +218,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                     console.log('All items viewed, restarting cycle');
                 }}
 
-                // Mark current item as viewed and remove from remaining
+                // Mark current item as viewed
                 const currentInRemaining = remainingItems.indexOf(currentIndex);
                 if (currentInRemaining !== -1) {{
                     remainingItems.splice(currentInRemaining, 1);
@@ -202,7 +231,6 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                     const targetIndex = remainingItems[randomIndex];
 
                     navigateToIndex(targetIndex);
-
                     console.log(`Navigating to random item ${{targetIndex + 1}} of ${{items.length}}`);
                 }}
             }}
@@ -214,7 +242,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 navigateToIndex(previousIndex, false);
             }}
 
-            // Delete functionality
+            // Deletion Functionality
             async function deleteCurrent() {{
                 if (!current) return;
 
@@ -224,6 +252,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 console.log('Deleting:', filename);
 
                 try {{
+                    // Send delete request
                     const response = await fetch('/api/delete?name=' + encodeURIComponent(filename), {{
                         method: 'DELETE'
                     }});
@@ -245,7 +274,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                         }} catch (e) {{}}
                     }}
 
-                    // Remove item from DOM and tracking
+                    // Remove from DOM and tracking
                     observer.unobserve(current);
                     current.remove();
 
@@ -253,7 +282,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                     if (removedIndex !== -1) {{
                         items.splice(removedIndex, 1);
 
-                        // Update random navigation state after deletion
+                        // Update random navigation state
                         remainingItems = remainingItems
                             .map(idx => idx > removedIndex ? idx - 1 : idx)
                             .filter(idx => idx !== removedIndex);
@@ -268,7 +297,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                         }});
                         viewedItems = newViewedItems;
 
-                        // Update history to adjust indices after deletion
+                        // Update history indices
                         history = history
                             .map(idx => idx > removedIndex ? idx - 1 : idx)
                             .filter(idx => idx !== removedIndex);
@@ -295,7 +324,7 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 }}
             }}
 
-            // Keyboard event handlers
+            // Keyboard Controls
             document.addEventListener('keydown', e => {{
                 const key = e.key.toLowerCase();
 
@@ -319,6 +348,10 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                     case 'b':
                         e.preventDefault();
                         navigateBackward();
+                        break;
+                    case ' ':
+                        e.preventDefault();
+                        toggleCurrentVideo();
                         break;
                 }}
             }});
