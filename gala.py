@@ -140,6 +140,19 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 return closest;
             }}
 
+            // Navigation functions
+            function navigateToNext() {{
+                if (items.length === 0) return;
+                const nextIndex = (currentIndex + 1) % items.length;
+                items[nextIndex].scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+            }}
+
+            function navigateToPrevious() {{
+                if (items.length === 0) return;
+                const prevIndex = (currentIndex - 1 + items.length) % items.length;
+                items[prevIndex].scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+            }}
+
             // Delete current item
             async function deleteCurrent() {{
                 if (!current) return;
@@ -191,6 +204,12 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 if (e.key === 'x' || e.key === 'X') {{
                     e.preventDefault();
                     deleteCurrent();
+                }} else if (e.key === 'j' || e.key === 'J') {{
+                    e.preventDefault();
+                    navigateToNext();
+                }} else if (e.key === 'k' || e.key === 'K') {{
+                    e.preventDefault();
+                    navigateToPrevious();
                 }}
             }});
         }})();
