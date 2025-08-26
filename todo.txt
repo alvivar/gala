@@ -1,0 +1,8 @@
+To do
+
+    - Maybe instead of just pressing X to delete, hold it for a couple of seconds to validate?
+
+Done
+
+    26 August 2025
+    - A remake of Qpost, incredibly simple.
