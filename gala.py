@@ -115,6 +115,10 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
             let current = items[0] || null;
             let currentIndex = 0;
 
+            // Random navigation state
+            let remainingItems = [...Array(items.length).keys()]; // [0, 1, 2, ...]
+            let viewedItems = new Set();
+
             // Intersection observer for tracking current item
             const observer = new IntersectionObserver(entries => {{
                 for (const entry of entries) {{
@@ -140,7 +144,35 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 return closest;
             }}
 
-            // Navigation functions
+            // Random navigation functions
+            function navigateToRandom() {{
+                if (items.length === 0) return;
+
+                // If all items have been viewed, reset the cycle
+                if (remainingItems.length === 0) {{
+                    remainingItems = [...Array(items.length).keys()];
+                    viewedItems.clear();
+                    console.log('All items viewed, restarting cycle');
+                }}
+
+                // Remove current item from remaining items if it exists
+                const currentInRemaining = remainingItems.indexOf(currentIndex);
+                if (currentInRemaining !== -1) {{
+                    remainingItems.splice(currentInRemaining, 1);
+                    viewedItems.add(currentIndex);
+                }}
+
+                // Pick a random item from remaining items
+                if (remainingItems.length > 0) {{
+                    const randomIndex = Math.floor(Math.random() * remainingItems.length);
+                    const targetIndex = remainingItems[randomIndex];
+
+                    items[targetIndex].scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                    console.log(`Navigating to random item ${{targetIndex + 1}} of ${{items.length}}`);
+                }}
+            }}
+
+            // Sequential navigation functions
             function navigateToNext() {{
                 if (items.length === 0) return;
                 const nextIndex = (currentIndex + 1) % items.length;
@@ -180,6 +212,19 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                     const removedIndex = items.indexOf(current);
                     if (removedIndex !== -1) {{
                         items.splice(removedIndex, 1);
+
+                        // Update random navigation state after deletion
+                        remainingItems = remainingItems
+                            .map(idx => idx > removedIndex ? idx - 1 : idx)
+                            .filter(idx => idx !== removedIndex);
+
+                        const newViewedItems = new Set();
+                        viewedItems.forEach(idx => {{
+                            if (idx !== removedIndex) {{
+                                newViewedItems.add(idx > removedIndex ? idx - 1 : idx);
+                            }}
+                        }});
+                        viewedItems = newViewedItems;
                     }}
 
                     // Navigate to next item or show empty state
@@ -210,6 +255,9 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
                 }} else if (e.key === 'k' || e.key === 'K') {{
                     e.preventDefault();
                     navigateToPrevious();
+                }} else if (e.key === 'n' || e.key === 'N') {{
+                    e.preventDefault();
+                    navigateToRandom();
                 }}
             }});
         }})();
