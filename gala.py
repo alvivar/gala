@@ -463,22 +463,22 @@ class GalleryHandler(SimpleHTTPRequestHandler):
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Serve a dynamic gallery and allow deletion with 'x'."
+        description="a simple python server that recursively creates a web gallery for images and videos in any folder"
     )
     parser.add_argument(
         "directory",
         nargs="?",
         default=".",
-        help="Directory to serve (default: current working directory)",
+        help="directory to serve (default: current working directory)",
     )
     parser.add_argument(
-        "--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)"
+        "--host", default="127.0.0.1", help="host to bind (default: 127.0.0.1)"
     )
     parser.add_argument(
-        "--port", type=int, default=8000, help="Port to bind (default: 8000)"
+        "--port", type=int, default=8000, help="port to bind (default: 8000)"
     )
     parser.add_argument(
-        "--no-open", action="store_true", help="Do not open browser on start"
+        "--no-open", action="store_true", help="do not open browser on start"
     )
     args = parser.parse_args()
 
