@@ -380,15 +380,6 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         else:
             super().do_GET()
 
-    def do_DELETE(self) -> None:
-        if not self._is_delete_endpoint():
-            self.send_error(404, "Not Found")
-            return
-
-        query_params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        filename = (query_params.get("name") or [""])[0]
-        self._handle_delete_request(filename)
-
     def do_POST(self) -> None:
         if not self._is_delete_endpoint():
             self.send_error(404, "Not Found")
@@ -403,8 +394,14 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         filename = self._extract_filename_from_post_data(raw_data)
         self._handle_delete_request(filename)
 
-    def _is_delete_endpoint(self) -> bool:
-        return urllib.parse.urlparse(self.path).path == "/api/delete"
+    def do_DELETE(self) -> None:
+        if not self._is_delete_endpoint():
+            self.send_error(404, "Not Found")
+            return
+
+        query_params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        filename = (query_params.get("name") or [""])[0]
+        self._handle_delete_request(filename)
 
     def _serve_gallery(self) -> None:
         files = list_media_files(self.base_dir)
@@ -415,19 +412,6 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         files = list_media_files(self.base_dir)
         content = json.dumps({"files": files}).encode("utf-8")
         self._send_response(200, "application/json; charset=utf-8", content)
-
-    def _extract_filename_from_post_data(self, raw_data: bytes) -> str:
-        if not raw_data:
-            return ""
-
-        try:
-            return json.loads(raw_data.decode("utf-8")).get("name", "")
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            try:
-                query_string = urllib.parse.parse_qs(raw_data.decode("utf-8"))
-                return (query_string.get("name") or [""])[0]
-            except UnicodeDecodeError:
-                return ""
 
     def _handle_delete_request(self, filename: str) -> None:
         if not filename:
@@ -446,6 +430,22 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             self._send_json_response(403, {"ok": False, "error": "Permission denied"})
         except Exception as error:
             self._send_json_response(500, {"ok": False, "error": str(error)})
+
+    def _is_delete_endpoint(self) -> bool:
+        return urllib.parse.urlparse(self.path).path == "/api/delete"
+
+    def _extract_filename_from_post_data(self, raw_data: bytes) -> str:
+        if not raw_data:
+            return ""
+
+        try:
+            return json.loads(raw_data.decode("utf-8")).get("name", "")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            try:
+                query_string = urllib.parse.parse_qs(raw_data.decode("utf-8"))
+                return (query_string.get("name") or [""])[0]
+            except UnicodeDecodeError:
+                return ""
 
     def _send_response(
         self, status_code: int, content_type: str, content: bytes
