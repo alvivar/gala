@@ -1,5 +1,6 @@
 To do
 
+    - Should autoclose when all "clients" are disconnected?
     - Maybe instead of just pressing X to delete, hold it for a couple of seconds to validate?
 
 Done
