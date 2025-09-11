@@ -43,20 +43,7 @@ def create_media_item_html(filename: str) -> str:
 def load_html_template() -> str:
     """Load HTML template from external file."""
     template_path = Path(__file__).parent / "gala.html"
-    try:
-        return template_path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        # Fallback to a minimal template if file is missing
-        return """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <title>Gala - Template Missing</title>
-</head>
-<body>
-    <p>Error: gala.html template file not found.</p>
-</body>
-</html>"""
+    return template_path.read_text(encoding="utf-8")
 
 
 def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
