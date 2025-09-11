@@ -41,12 +41,11 @@ def create_media_item_html(filename: str) -> str:
 
 
 def load_html_template() -> str:
-    """Load HTML template from external file."""
     template_path = Path(__file__).parent / "gala.html"
     return template_path.read_text(encoding="utf-8")
 
 
-def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
+def generate_gallery_html(files: list[str]) -> bytes:
     if files:
         items_html = "\n".join(create_media_item_html(filename) for filename in files)
     else:
@@ -54,83 +53,72 @@ def generate_gallery_html(base_dir: Path, files: list[str]) -> bytes:
 
     html_template = load_html_template()
     html_document = html_template.replace("{items_html}", items_html)
-
     return html_document.encode("utf-8")
 
 
 class GalleryHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory: str | None = None, **kwargs):
-        base = Path(directory or os.getcwd()).resolve()
-        self.base_dir: Path = base
-        super().__init__(*args, directory=str(base), **kwargs)
+        self.base_dir = Path(directory or os.getcwd()).resolve()
+        super().__init__(*args, directory=str(self.base_dir), **kwargs)
 
     def do_GET(self) -> None:
-        parsed_url = urllib.parse.urlparse(self.path)
-        path = parsed_url.path
-
-        if path == "/":
+        if self.path == "/":
             self._serve_gallery()
         else:
             super().do_GET()
 
     def do_DELETE(self) -> None:
-        if not self._is_delete_endpoint():
+        if urllib.parse.urlparse(self.path).path != "/api/delete":
             self.send_error(404, "Not Found")
             return
 
         query_params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
         filename = (query_params.get("name") or [""])[0]
-        self._handle_delete_request(filename)
+        self._delete_file(filename)
 
     def _serve_gallery(self) -> None:
         files = list_media_files(self.base_dir)
-        content = generate_gallery_html(self.base_dir, files)
+        content = generate_gallery_html(files)
         self._send_response(200, "text/html; charset=utf-8", content)
 
-    def _handle_delete_request(self, filename: str) -> None:
+    def _delete_file(self, filename: str) -> None:
         if not filename:
-            self._send_json_response(400, {"ok": False, "error": "Missing filename"})
+            self._send_json(400, {"ok": False, "error": "Missing filename"})
             return
 
-        decoded_filename = urllib.parse.unquote(filename)
-        file_path = (self.base_dir / decoded_filename).resolve()
+        file_path = (self.base_dir / urllib.parse.unquote(filename)).resolve()
 
         try:
             file_path.unlink()
-            self._send_json_response(200, {"ok": True})
+            self._send_json(200, {"ok": True})
         except FileNotFoundError:
-            self._send_json_response(404, {"ok": False, "error": "File not found"})
+            self._send_json(404, {"ok": False, "error": "File not found"})
         except PermissionError:
-            self._send_json_response(403, {"ok": False, "error": "Permission denied"})
+            self._send_json(403, {"ok": False, "error": "Permission denied"})
         except Exception as error:
-            self._send_json_response(500, {"ok": False, "error": str(error)})
+            self._send_json(500, {"ok": False, "error": str(error)})
 
-    def _is_delete_endpoint(self) -> bool:
-        return urllib.parse.urlparse(self.path).path == "/api/delete"
-
-    def _send_response(
-        self, status_code: int, content_type: str, content: bytes
-    ) -> None:
-        self.send_response(status_code)
+    def _send_response(self, status: int, content_type: str, content: bytes) -> None:
+        self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)
 
-    def _send_json_response(self, status_code: int, data: dict) -> None:
+    def _send_json(self, status: int, data: dict) -> None:
         content = json.dumps(data).encode("utf-8")
-        self._send_response(status_code, "application/json; charset=utf-8", content)
+        self._send_response(status, "application/json; charset=utf-8", content)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="a simple python server that recursively creates a web gallery for images and videos in any folder"
+        description="Simple web gallery server for images and videos"
     )
     parser.add_argument(
         "directory",
         nargs="?",
         default=".",
-        help="directory to serve (default: current working directory)",
+        help="directory to serve (default: current directory)",
     )
     parser.add_argument(
         "--host", default="127.0.0.1", help="host to bind (default: 127.0.0.1)"
@@ -148,10 +136,10 @@ def main() -> None:
         print(f"Directory not found: {base_directory}", file=sys.stderr)
         sys.exit(1)
 
-    RequestHandler = partial(GalleryHandler, directory=str(base_directory))
-    server = ThreadingHTTPServer((args.host, args.port), RequestHandler)
-
+    handler = partial(GalleryHandler, directory=str(base_directory))
+    server = ThreadingHTTPServer((args.host, args.port), handler)
     server_url = f"http://{args.host}:{args.port}/"
+
     print(f"Serving {base_directory} at {server_url}")
 
     if not args.no_open:
