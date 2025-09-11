@@ -70,24 +70,8 @@ class GalleryHandler(SimpleHTTPRequestHandler):
 
         if path == "/":
             self._serve_gallery()
-        elif path == "/api/list":
-            self._serve_file_list()
         else:
             super().do_GET()
-
-    def do_POST(self) -> None:
-        if not self._is_delete_endpoint():
-            self.send_error(404, "Not Found")
-            return
-
-        content_length = int(self.headers.get("Content-Length") or 0)
-        if content_length == 0:
-            self._handle_delete_request("")
-            return
-
-        raw_data = self.rfile.read(content_length)
-        filename = self._extract_filename_from_post_data(raw_data)
-        self._handle_delete_request(filename)
 
     def do_DELETE(self) -> None:
         if not self._is_delete_endpoint():
@@ -102,11 +86,6 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         files = list_media_files(self.base_dir)
         content = generate_gallery_html(self.base_dir, files)
         self._send_response(200, "text/html; charset=utf-8", content)
-
-    def _serve_file_list(self) -> None:
-        files = list_media_files(self.base_dir)
-        content = json.dumps({"files": files}).encode("utf-8")
-        self._send_response(200, "application/json; charset=utf-8", content)
 
     def _handle_delete_request(self, filename: str) -> None:
         if not filename:
@@ -128,19 +107,6 @@ class GalleryHandler(SimpleHTTPRequestHandler):
 
     def _is_delete_endpoint(self) -> bool:
         return urllib.parse.urlparse(self.path).path == "/api/delete"
-
-    def _extract_filename_from_post_data(self, raw_data: bytes) -> str:
-        if not raw_data:
-            return ""
-
-        try:
-            return json.loads(raw_data.decode("utf-8")).get("name", "")
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            try:
-                query_string = urllib.parse.parse_qs(raw_data.decode("utf-8"))
-                return (query_string.get("name") or [""])[0]
-            except UnicodeDecodeError:
-                return ""
 
     def _send_response(
         self, status_code: int, content_type: str, content: bytes
