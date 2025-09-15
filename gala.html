@@ -184,11 +184,13 @@
                     }
 
                     // Mark current item as viewed
+                    viewedItems.add(currentIndex);
+
+                    // Remove current item from remaining items if it's there
                     const currentInRemaining =
                         remainingItems.indexOf(currentIndex);
                     if (currentInRemaining !== -1) {
                         remainingItems.splice(currentInRemaining, 1);
-                        viewedItems.add(currentIndex);
                     }
 
                     // Navigate to random unviewed item
