@@ -65,17 +65,17 @@
         <div class="grid">{items_html}</div>
         <script>
             (function () {
-                // State management
+                // State Management
+
                 let items = Array.from(document.querySelectorAll(".item"));
                 let current = items[0] || null;
                 let currentIndex = 0;
                 let history = [];
-
-                // Random navigation state
                 let remainingItems = [...Array(items.length).keys()];
                 let viewedItems = new Set();
 
-                // Initialize intersection observer for tracking current item
+                // Intersection Observer
+
                 const observer = new IntersectionObserver(
                     (entries) => {
                         entries.forEach((entry) => {
@@ -85,16 +85,13 @@
                                 entry.isIntersecting &&
                                 entry.intersectionRatio > 0.6 - 0.01
                             ) {
-                                // Update current item tracking
                                 current = entry.target;
                                 currentIndex = items.indexOf(entry.target);
 
-                                // Auto-play videos when they enter view
                                 if (video) {
                                     video.play();
                                 }
                             } else {
-                                // Auto-pause and mute videos when out of sight
                                 if (video && !video.paused) {
                                     video.pause();
                                     video.muted = true;
@@ -105,12 +102,12 @@
                     { threshold: [0, 0.6, 1] }
                 );
 
-                // Start observing all items
                 items.forEach((item, index) => {
                     observer.observe(item);
                 });
 
                 // Utility Functions
+
                 function findClosestToCenter() {
                     const center = innerHeight / 2;
                     let closest = null;
@@ -142,6 +139,7 @@
                 }
 
                 // Video Controls
+
                 function toggleCurrentVideo() {
                     if (!current) {
                         return;
@@ -160,6 +158,7 @@
                 }
 
                 // Navigation Functions
+
                 function navigateToNext() {
                     if (items.length === 0) {
                         return;
@@ -184,23 +183,19 @@
                         return;
                     }
 
-                    // Reset cycle if all items have been viewed
                     if (remainingItems.length === 0) {
                         remainingItems = [...Array(items.length).keys()];
                         viewedItems.clear();
                     }
 
-                    // Mark current item as viewed
                     viewedItems.add(currentIndex);
 
-                    // Remove current item from remaining items if it's there
                     const currentInRemaining =
                         remainingItems.indexOf(currentIndex);
                     if (currentInRemaining !== -1) {
                         remainingItems.splice(currentInRemaining, 1);
                     }
 
-                    // Navigate to random unviewed item
                     if (remainingItems.length > 0) {
                         const randomIndex = Math.floor(
                             Math.random() * remainingItems.length
@@ -221,6 +216,7 @@
                 }
 
                 // Deletion Functionality
+
                 async function deleteCurrent() {
                     if (!current) {
                         return;
@@ -232,7 +228,6 @@
                     }
 
                     try {
-                        // Send delete request
                         const response = await fetch(
                             "/api/delete?name=" + encodeURIComponent(filename),
                             {
@@ -250,7 +245,6 @@
                             return;
                         }
 
-                        // Clean up video resources
                         const video = current.querySelector("video");
                         if (video) {
                             try {
@@ -259,7 +253,6 @@
                             } catch (e) {}
                         }
 
-                        // Remove from DOM and tracking
                         observer.unobserve(current);
                         current.remove();
 
@@ -268,14 +261,12 @@
                         if (removedIndex !== -1) {
                             items.splice(removedIndex, 1);
 
-                            // Update random navigation state
                             remainingItems = remainingItems
                                 .map((idx) =>
                                     idx > removedIndex ? idx - 1 : idx
                                 )
                                 .filter((idx) => idx !== removedIndex);
 
-                            // Update viewed items set
                             const newViewedItems = new Set();
                             viewedItems.forEach((idx) => {
                                 if (idx !== removedIndex) {
@@ -286,7 +277,6 @@
                             });
                             viewedItems = newViewedItems;
 
-                            // Update history indices
                             history = history
                                 .map((idx) =>
                                     idx > removedIndex ? idx - 1 : idx
@@ -294,7 +284,6 @@
                                 .filter((idx) => idx !== removedIndex);
                         }
 
-                        // Navigate to next item or show empty state
                         if (items.length > 0) {
                             const target = findClosestToCenter();
                             if (target) {
@@ -316,6 +305,7 @@
                 }
 
                 // Keyboard Controls
+
                 document.addEventListener("keydown", (e) => {
                     const key = e.key.toLowerCase();
 
