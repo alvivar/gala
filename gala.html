@@ -88,10 +88,6 @@
                                 // Update current item tracking
                                 current = entry.target;
                                 currentIndex = items.indexOf(entry.target);
-                                console.log(
-                                    "Current image:",
-                                    current.getAttribute("data-filename")
-                                );
 
                                 // Auto-play videos when they enter view
                                 if (video) {
@@ -110,7 +106,9 @@
                 );
 
                 // Start observing all items
-                items.forEach((item) => observer.observe(item));
+                items.forEach((item, index) => {
+                    observer.observe(item);
+                });
 
                 // Utility Functions
                 function findClosestToCenter() {
@@ -118,7 +116,7 @@
                     let closest = null;
                     let minDistance = Infinity;
 
-                    items.forEach((item) => {
+                    items.forEach((item, index) => {
                         const rect = item.getBoundingClientRect();
                         const itemCenter = rect.top + rect.height / 2;
                         const distance = Math.abs(itemCenter - center);
@@ -145,10 +143,14 @@
 
                 // Video Controls
                 function toggleCurrentVideo() {
-                    if (!current) return;
+                    if (!current) {
+                        return;
+                    }
 
                     const video = current.querySelector("video");
-                    if (!video) return;
+                    if (!video) {
+                        return;
+                    }
 
                     if (video.paused) {
                         video.play();
@@ -159,14 +161,18 @@
 
                 // Navigation Functions
                 function navigateToNext() {
-                    if (items.length === 0) return;
+                    if (items.length === 0) {
+                        return;
+                    }
 
                     const nextIndex = (currentIndex + 1) % items.length;
                     navigateToIndex(nextIndex);
                 }
 
                 function navigateToPrevious() {
-                    if (items.length === 0) return;
+                    if (items.length === 0) {
+                        return;
+                    }
 
                     const prevIndex =
                         (currentIndex - 1 + items.length) % items.length;
@@ -174,13 +180,14 @@
                 }
 
                 function navigateToRandom() {
-                    if (items.length === 0) return;
+                    if (items.length === 0) {
+                        return;
+                    }
 
                     // Reset cycle if all items have been viewed
                     if (remainingItems.length === 0) {
                         remainingItems = [...Array(items.length).keys()];
                         viewedItems.clear();
-                        console.log("All items viewed, restarting cycle");
                     }
 
                     // Mark current item as viewed
@@ -201,16 +208,13 @@
                         const targetIndex = remainingItems[randomIndex];
 
                         navigateToIndex(targetIndex);
-                        console.log(
-                            `Navigating to random item ${targetIndex + 1} of ${
-                                items.length
-                            }`
-                        );
                     }
                 }
 
                 function navigateBackward() {
-                    if (history.length === 0) return;
+                    if (history.length === 0) {
+                        return;
+                    }
 
                     const previousIndex = history.pop();
                     navigateToIndex(previousIndex, false);
@@ -218,12 +222,14 @@
 
                 // Deletion Functionality
                 async function deleteCurrent() {
-                    if (!current) return;
+                    if (!current) {
+                        return;
+                    }
 
                     const filename = current.getAttribute("data-filename");
-                    if (!filename) return;
-
-                    console.log("Deleting:", filename);
+                    if (!filename) {
+                        return;
+                    }
 
                     try {
                         // Send delete request
@@ -258,6 +264,7 @@
                         current.remove();
 
                         const removedIndex = items.indexOf(current);
+
                         if (removedIndex !== -1) {
                             items.splice(removedIndex, 1);
 
@@ -298,10 +305,6 @@
 
                                 current = target;
                                 currentIndex = items.indexOf(target);
-                                console.log(
-                                    "Current image:",
-                                    current.getAttribute("data-filename")
-                                );
                             }
                         } else {
                             document.body.innerHTML =
