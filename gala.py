@@ -56,6 +56,30 @@ def generate_gallery_html(files: list[str]) -> bytes:
     return html_document.encode("utf-8")
 
 
+def save_path_to_history(path: str) -> None:
+    history_file = Path("history.txt")
+
+    existing_paths = []
+    if history_file.exists():
+        try:
+            content = history_file.read_text(encoding="utf-8").strip()
+            if content:
+                existing_paths = [p for p in content.split("\n") if p.strip()]
+        except Exception:
+            pass
+
+    try:
+        existing_paths.remove(path)
+    except ValueError:
+        pass
+
+    updated_paths = [path] + existing_paths
+    try:
+        history_file.write_text("\n".join(updated_paths) + "\n", encoding="utf-8")
+    except Exception:
+        pass
+
+
 class GalleryHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory: str | None = None, **kwargs):
         self.base_dir = Path(directory or os.getcwd()).resolve()
@@ -135,6 +159,9 @@ def main() -> None:
     if not base_directory.exists():
         print(f"Directory not found: {base_directory}", file=sys.stderr)
         sys.exit(1)
+
+    if args.directory != ".":
+        save_path_to_history(str(base_directory))
 
     handler = partial(GalleryHandler, directory=str(base_directory))
     server = ThreadingHTTPServer((args.host, args.port), handler)
