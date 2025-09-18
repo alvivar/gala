@@ -508,6 +508,10 @@
 
                 // Keyboard Controls
                 document.addEventListener("keydown", (e) => {
+                    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) {
+                        return;
+                    }
+
                     const key = e.key.toLowerCase();
 
                     switch (key) {
@@ -534,6 +538,22 @@
                         case " ":
                             e.preventDefault();
                             toggleCurrentVideo();
+                            break;
+                        case "h":
+                            e.preventDefault();
+                            navigateToNextPath();
+                            break;
+                        case "l":
+                            e.preventDefault();
+                            navigateToPreviousPath();
+                            break;
+                        case "u":
+                            e.preventDefault();
+                            navigateToFirstInPath();
+                            break;
+                        case "i":
+                            e.preventDefault();
+                            navigateToLastInPath();
                             break;
                         case "pagedown":
                             e.preventDefault();
