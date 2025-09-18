@@ -5,7 +5,6 @@
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <title>Gala</title>
         <style>
-            /* Base Styles */
             * {
                 box-sizing: border-box;
             }
@@ -23,7 +22,6 @@
                 color: #eee;
             }
 
-            /* Grid Layout */
             .grid {
                 display: block;
                 height: 100vh;
@@ -33,7 +31,6 @@
                 margin: 0;
             }
 
-            /* Item Container */
             .item {
                 height: 100vh;
                 display: flex;
@@ -44,7 +41,6 @@
                 scroll-snap-align: start;
             }
 
-            /* Media Elements */
             .item img,
             .item video {
                 display: block;
@@ -56,7 +52,6 @@
                 background: #000;
             }
 
-            /* Link Styling */
             .item a {
                 display: flex;
                 width: 100%;
@@ -67,7 +62,6 @@
                 text-decoration: none;
             }
 
-            /* Media Elements - No Loading States Needed */
             .lazy-image,
             .lazy-video {
                 background: #000;
@@ -86,9 +80,7 @@
                 let remainingItems = [...Array(items.length).keys()];
                 let viewedItems = new Set();
 
-                // Lazy Loading Functions
-
-                // Image Loading
+                // Lazy Loading
                 function loadImage(img) {
                     if (img.src || !img.dataset.src) {
                         return Promise.resolve();
@@ -116,7 +108,6 @@
                     });
                 }
 
-                // Video Loading
                 function loadVideo(video) {
                     if (video.src || !video.dataset.src) {
                         return Promise.resolve();
@@ -146,7 +137,6 @@
                     });
                 }
 
-                // Range Loading
                 function loadMediaInRange(centerIndex, range = 2) {
                     const startIndex = Math.max(0, centerIndex - range);
                     const endIndex = Math.min(
@@ -169,7 +159,6 @@
                     }
                 }
 
-                // Intersection Observer
                 const observer = new IntersectionObserver(
                     (entries) => {
                         entries.forEach((entry) => {
@@ -182,15 +171,8 @@
                                 current = entry.target;
                                 currentIndex = items.indexOf(entry.target);
 
-                                // Log current media being shown
-                                const filename =
-                                    current.getAttribute("data-filename");
-                                console.log(filename || "Unknown");
-
-                                // Load media in range when this item becomes current
                                 loadMediaInRange(currentIndex);
 
-                                // Only try to play video if it has been loaded
                                 if (video && video.src) {
                                     video.play().catch(() => {});
                                 }
@@ -209,14 +191,11 @@
                     observer.observe(item);
                 });
 
-                // Initial load - load the first few media items immediately
                 if (items.length > 0) {
                     loadMediaInRange(0);
                 }
 
-                // Utility Functions
-
-                // Find Closest Item
+                // Utilities
                 function findClosestToCenter() {
                     const center = innerHeight / 2;
                     let closest = null;
@@ -236,13 +215,11 @@
                     return closest;
                 }
 
-                // Navigate to Index
                 function navigateToIndex(targetIndex, addToHistory = true) {
                     if (addToHistory && currentIndex !== targetIndex) {
                         history.push(currentIndex);
                     }
 
-                    // Preload media around the target before scrolling
                     loadMediaInRange(targetIndex);
 
                     items[targetIndex].scrollIntoView({
@@ -251,9 +228,6 @@
                     });
                 }
 
-                // Video Controls
-
-                // Toggle Video Playback
                 function toggleCurrentVideo() {
                     if (!current) {
                         return;
@@ -264,7 +238,6 @@
                         return;
                     }
 
-                    // Load video first if not loaded yet
                     if (!video.src && video.dataset.src) {
                         loadVideo(video)
                             .then(() => {
@@ -281,9 +254,7 @@
                     }
                 }
 
-                // Navigation Functions
-
-                // Next Item
+                // Basic Navigation
                 function navigateToNext() {
                     if (items.length === 0) {
                         return;
@@ -293,7 +264,6 @@
                     navigateToIndex(nextIndex);
                 }
 
-                // Previous Item
                 function navigateToPrevious() {
                     if (items.length === 0) {
                         return;
@@ -304,12 +274,11 @@
                     navigateToIndex(prevIndex);
                 }
 
-                // Path-based Navigation
+                // Path Navigation
                 function getItemPath(item) {
                     const filename = item.getAttribute("data-filename");
                     if (!filename) return "";
 
-                    // Extract directory path from filename
                     const lastSlash = filename.lastIndexOf("/");
                     const lastBackslash = filename.lastIndexOf("\\");
                     const separatorIndex = Math.max(lastSlash, lastBackslash);
@@ -319,7 +288,6 @@
                         : "";
                 }
 
-                // Navigate to Next Path
                 function navigateToNextPath() {
                     if (items.length === 0) {
                         return;
@@ -327,7 +295,6 @@
 
                     const currentPath = getItemPath(current);
 
-                    // Find the next item with a different path
                     for (let i = currentIndex + 1; i < items.length; i++) {
                         const itemPath = getItemPath(items[i]);
                         if (itemPath !== currentPath) {
@@ -336,7 +303,6 @@
                         }
                     }
 
-                    // If no different path found, wrap to beginning
                     for (let i = 0; i < currentIndex; i++) {
                         const itemPath = getItemPath(items[i]);
                         if (itemPath !== currentPath) {
@@ -346,7 +312,6 @@
                     }
                 }
 
-                // Navigate to Previous Path
                 function navigateToPreviousPath() {
                     if (items.length === 0) {
                         return;
@@ -354,11 +319,9 @@
 
                     const currentPath = getItemPath(current);
 
-                    // Find the previous item with a different path
                     for (let i = currentIndex - 1; i >= 0; i--) {
                         const itemPath = getItemPath(items[i]);
                         if (itemPath !== currentPath) {
-                            // Find the first item of this different path
                             let firstOfPath = i;
                             for (let j = i - 1; j >= 0; j--) {
                                 if (getItemPath(items[j]) === itemPath) {
@@ -372,11 +335,9 @@
                         }
                     }
 
-                    // If no different path found, wrap to end
                     for (let i = items.length - 1; i > currentIndex; i--) {
                         const itemPath = getItemPath(items[i]);
                         if (itemPath !== currentPath) {
-                            // Find the first item of this different path
                             let firstOfPath = i;
                             for (let j = i - 1; j > currentIndex; j--) {
                                 if (getItemPath(items[j]) === itemPath) {
@@ -391,7 +352,6 @@
                     }
                 }
 
-                // Navigate to First Item in Current Path
                 function navigateToFirstInPath() {
                     if (items.length === 0) {
                         return;
@@ -399,7 +359,6 @@
 
                     const currentPath = getItemPath(current);
 
-                    // Find the first item with the same path
                     for (let i = 0; i < items.length; i++) {
                         const itemPath = getItemPath(items[i]);
                         if (itemPath === currentPath) {
@@ -409,7 +368,6 @@
                     }
                 }
 
-                // Navigate to Last Item in Current Path
                 function navigateToLastInPath() {
                     if (items.length === 0) {
                         return;
@@ -417,7 +375,6 @@
 
                     const currentPath = getItemPath(current);
 
-                    // Find the last item with the same path
                     for (let i = items.length - 1; i >= 0; i--) {
                         const itemPath = getItemPath(items[i]);
                         if (itemPath === currentPath) {
@@ -427,13 +384,12 @@
                     }
                 }
 
-                // Random Item
+                // Random Navigation
                 function navigateToRandom() {
                     if (items.length === 0) {
                         return;
                     }
 
-                    // Reset if all items have been viewed
                     if (remainingItems.length === 0) {
                         remainingItems = [...Array(items.length).keys()];
                         viewedItems.clear();
@@ -441,7 +397,6 @@
 
                     viewedItems.add(currentIndex);
 
-                    // Remove current item from remaining items
                     const currentInRemaining =
                         remainingItems.indexOf(currentIndex);
                     if (currentInRemaining !== -1) {
@@ -457,7 +412,6 @@
                     }
                 }
 
-                // Back in History
                 function navigateBackward() {
                     if (history.length === 0) {
                         return;
@@ -467,9 +421,7 @@
                     navigateToIndex(previousIndex, false);
                 }
 
-                // Deletion Functionality
-
-                // Delete Current Item
+                // Deletion
                 async function deleteCurrent() {
                     if (!current) {
                         return;
@@ -496,7 +448,6 @@
                             return;
                         }
 
-                        // Clean up video resources
                         const video = current.querySelector("video");
                         if (video) {
                             try {
@@ -505,23 +456,19 @@
                             } catch (e) {}
                         }
 
-                        // Remove from DOM and observer
                         observer.unobserve(current);
                         current.remove();
 
-                        // Update state arrays
                         const removedIndex = items.indexOf(current);
                         if (removedIndex !== -1) {
                             items.splice(removedIndex, 1);
 
-                            // Adjust remaining items indices
                             remainingItems = remainingItems
                                 .map((idx) =>
                                     idx > removedIndex ? idx - 1 : idx
                                 )
                                 .filter((idx) => idx !== removedIndex);
 
-                            // Adjust viewed items indices
                             const newViewedItems = new Set();
                             viewedItems.forEach((idx) => {
                                 if (idx !== removedIndex) {
@@ -532,7 +479,6 @@
                             });
                             viewedItems = newViewedItems;
 
-                            // Adjust history indices
                             history = history
                                 .map((idx) =>
                                     idx > removedIndex ? idx - 1 : idx
@@ -540,7 +486,6 @@
                                 .filter((idx) => idx !== removedIndex);
                         }
 
-                        // Navigate to closest remaining item or show empty message
                         if (items.length > 0) {
                             const target = findClosestToCenter();
                             if (target) {
