@@ -5,13 +5,16 @@
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <title>Gala</title>
         <style>
+            /* Base Styles */
             * {
                 box-sizing: border-box;
             }
+
             html,
             body {
                 height: 100%;
             }
+
             body {
                 margin: 0;
                 font-family: system-ui, -apple-system, Segoe UI, Roboto,
@@ -19,6 +22,8 @@
                 background: #111;
                 color: #eee;
             }
+
+            /* Grid Layout */
             .grid {
                 display: block;
                 height: 100vh;
@@ -27,6 +32,8 @@
                 padding: 0;
                 margin: 0;
             }
+
+            /* Item Container */
             .item {
                 height: 100vh;
                 display: flex;
@@ -36,6 +43,8 @@
                 overflow: hidden;
                 scroll-snap-align: start;
             }
+
+            /* Media Elements */
             .item img,
             .item video {
                 display: block;
@@ -46,6 +55,8 @@
                 object-fit: contain;
                 background: #000;
             }
+
+            /* Link Styling */
             .item a {
                 display: flex;
                 width: 100%;
@@ -55,20 +66,26 @@
                 color: inherit;
                 text-decoration: none;
             }
+
+            /* Lazy Loading States */
             .lazy-image,
             .lazy-video {
                 opacity: 0;
                 transition: opacity 0.3s ease;
                 background: #222;
             }
+
             .lazy-image.loading,
             .lazy-video.loading {
                 opacity: 0.5;
             }
+
             .lazy-image.loaded,
             .lazy-video.loaded {
                 opacity: 1;
             }
+
+            /* Loading Spinner */
             .lazy-image::before,
             .lazy-video::before {
                 content: "";
@@ -84,12 +101,15 @@
                 animation: spin 1s linear infinite;
                 z-index: 1;
             }
+
             .lazy-image.loaded::before,
             .lazy-image.error::before,
             .lazy-video.loaded::before,
             .lazy-video.error::before {
                 display: none;
             }
+
+            /* Spinner Animation */
             @keyframes spin {
                 0% {
                     transform: rotate(0deg);
@@ -105,7 +125,6 @@
         <script>
             (function () {
                 // State Management
-
                 let items = Array.from(document.querySelectorAll(".item"));
                 let current = items[0] || null;
                 let currentIndex = 0;
@@ -115,6 +134,7 @@
 
                 // Lazy Loading Functions
 
+                // Image Loading
                 function loadImage(img) {
                     if (img.src || !img.dataset.src) {
                         return Promise.resolve();
@@ -124,21 +144,25 @@
                         img.classList.add("loading");
 
                         const tempImg = new Image();
+
                         tempImg.onload = () => {
                             img.src = img.dataset.src;
                             img.classList.remove("loading");
                             img.classList.add("loaded");
                             resolve();
                         };
+
                         tempImg.onerror = () => {
                             img.classList.remove("loading");
                             img.classList.add("error");
                             reject(new Error("Failed to load image"));
                         };
+
                         tempImg.src = img.dataset.src;
                     });
                 }
 
+                // Video Loading
                 function loadVideo(video) {
                     if (video.src || !video.dataset.src) {
                         return Promise.resolve();
@@ -154,6 +178,7 @@
                             video.onerror = null;
                             resolve();
                         };
+
                         video.onerror = () => {
                             video.classList.remove("loading");
                             video.classList.add("error");
@@ -167,6 +192,7 @@
                     });
                 }
 
+                // Range Loading
                 function loadMediaInRange(centerIndex, range = 2) {
                     const startIndex = Math.max(0, centerIndex - range);
                     const endIndex = Math.min(
@@ -182,6 +208,7 @@
                         if (img && !img.src) {
                             loadImage(img).catch(() => {});
                         }
+
                         if (video && !video.src) {
                             loadVideo(video).catch(() => {});
                         }
@@ -189,16 +216,15 @@
                 }
 
                 // Intersection Observer
-
                 const observer = new IntersectionObserver(
                     (entries) => {
                         entries.forEach((entry) => {
                             const video = entry.target.querySelector("video");
-
-                            if (
+                            const isVisible =
                                 entry.isIntersecting &&
-                                entry.intersectionRatio > 0.6 - 0.01
-                            ) {
+                                entry.intersectionRatio > 0.6 - 0.01;
+
+                            if (isVisible) {
                                 current = entry.target;
                                 currentIndex = items.indexOf(entry.target);
 
@@ -220,7 +246,7 @@
                     { threshold: [0, 0.6, 1] }
                 );
 
-                items.forEach((item, index) => {
+                items.forEach((item) => {
                     observer.observe(item);
                 });
 
@@ -231,12 +257,13 @@
 
                 // Utility Functions
 
+                // Find Closest Item
                 function findClosestToCenter() {
                     const center = innerHeight / 2;
                     let closest = null;
                     let minDistance = Infinity;
 
-                    items.forEach((item, index) => {
+                    items.forEach((item) => {
                         const rect = item.getBoundingClientRect();
                         const itemCenter = rect.top + rect.height / 2;
                         const distance = Math.abs(itemCenter - center);
@@ -250,6 +277,7 @@
                     return closest;
                 }
 
+                // Navigate to Index
                 function navigateToIndex(targetIndex, addToHistory = true) {
                     if (addToHistory && currentIndex !== targetIndex) {
                         history.push(currentIndex);
@@ -266,6 +294,7 @@
 
                 // Video Controls
 
+                // Toggle Video Playback
                 function toggleCurrentVideo() {
                     if (!current) {
                         return;
@@ -295,6 +324,7 @@
 
                 // Navigation Functions
 
+                // Next Item
                 function navigateToNext() {
                     if (items.length === 0) {
                         return;
@@ -304,6 +334,7 @@
                     navigateToIndex(nextIndex);
                 }
 
+                // Previous Item
                 function navigateToPrevious() {
                     if (items.length === 0) {
                         return;
@@ -314,11 +345,13 @@
                     navigateToIndex(prevIndex);
                 }
 
+                // Random Item
                 function navigateToRandom() {
                     if (items.length === 0) {
                         return;
                     }
 
+                    // Reset if all items have been viewed
                     if (remainingItems.length === 0) {
                         remainingItems = [...Array(items.length).keys()];
                         viewedItems.clear();
@@ -326,6 +359,7 @@
 
                     viewedItems.add(currentIndex);
 
+                    // Remove current item from remaining items
                     const currentInRemaining =
                         remainingItems.indexOf(currentIndex);
                     if (currentInRemaining !== -1) {
@@ -337,11 +371,11 @@
                             Math.random() * remainingItems.length
                         );
                         const targetIndex = remainingItems[randomIndex];
-
                         navigateToIndex(targetIndex);
                     }
                 }
 
+                // Back in History
                 function navigateBackward() {
                     if (history.length === 0) {
                         return;
@@ -353,6 +387,7 @@
 
                 // Deletion Functionality
 
+                // Delete Current Item
                 async function deleteCurrent() {
                     if (!current) {
                         return;
@@ -366,9 +401,7 @@
                     try {
                         const response = await fetch(
                             "/api/delete?name=" + encodeURIComponent(filename),
-                            {
-                                method: "DELETE",
-                            }
+                            { method: "DELETE" }
                         );
 
                         const data = await response.json().catch(() => ({}));
@@ -381,6 +414,7 @@
                             return;
                         }
 
+                        // Clean up video resources
                         const video = current.querySelector("video");
                         if (video) {
                             try {
@@ -389,20 +423,23 @@
                             } catch (e) {}
                         }
 
+                        // Remove from DOM and observer
                         observer.unobserve(current);
                         current.remove();
 
+                        // Update state arrays
                         const removedIndex = items.indexOf(current);
-
                         if (removedIndex !== -1) {
                             items.splice(removedIndex, 1);
 
+                            // Adjust remaining items indices
                             remainingItems = remainingItems
                                 .map((idx) =>
                                     idx > removedIndex ? idx - 1 : idx
                                 )
                                 .filter((idx) => idx !== removedIndex);
 
+                            // Adjust viewed items indices
                             const newViewedItems = new Set();
                             viewedItems.forEach((idx) => {
                                 if (idx !== removedIndex) {
@@ -413,6 +450,7 @@
                             });
                             viewedItems = newViewedItems;
 
+                            // Adjust history indices
                             history = history
                                 .map((idx) =>
                                     idx > removedIndex ? idx - 1 : idx
@@ -420,6 +458,7 @@
                                 .filter((idx) => idx !== removedIndex);
                         }
 
+                        // Navigate to closest remaining item or show empty message
                         if (items.length > 0) {
                             const target = findClosestToCenter();
                             if (target) {
@@ -441,7 +480,6 @@
                 }
 
                 // Keyboard Controls
-
                 document.addEventListener("keydown", (e) => {
                     const key = e.key.toLowerCase();
 

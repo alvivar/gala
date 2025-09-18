@@ -33,9 +33,16 @@ def create_media_item_html(filename: str) -> str:
     extension = Path(filename).suffix.lower()
 
     if extension in VIDEO_EXTENSIONS:
-        media_tag = f'<video data-src="{quoted_src}" controls muted playsinline class="lazy-video" preload="none"></video>'
+        media_tag = (
+            f'<video data-src="{quoted_src}" controls muted playsinline '
+            f'class="lazy-video" preload="none"></video>'
+        )
     else:
-        media_tag = f'<a href="{quoted_src}" target="_blank" rel="noopener"><img data-src="{quoted_src}" alt="{safe_name}" class="lazy-image" /></a>'
+        media_tag = (
+            f'<a href="{quoted_src}" target="_blank" rel="noopener">'
+            f'<img data-src="{quoted_src}" alt="{safe_name}" class="lazy-image" />'
+            f"</a>"
+        )
 
     return f'<div class="item" data-name="{safe_name}" data-filename="{quoted_src}">{media_tag}</div>'
 
