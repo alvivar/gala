@@ -304,6 +304,129 @@
                     navigateToIndex(prevIndex);
                 }
 
+                // Path-based Navigation
+                function getItemPath(item) {
+                    const filename = item.getAttribute("data-filename");
+                    if (!filename) return "";
+
+                    // Extract directory path from filename
+                    const lastSlash = filename.lastIndexOf("/");
+                    const lastBackslash = filename.lastIndexOf("\\");
+                    const separatorIndex = Math.max(lastSlash, lastBackslash);
+
+                    return separatorIndex > -1
+                        ? filename.substring(0, separatorIndex)
+                        : "";
+                }
+
+                // Navigate to Next Path
+                function navigateToNextPath() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    const currentPath = getItemPath(current);
+
+                    // Find the next item with a different path
+                    for (let i = currentIndex + 1; i < items.length; i++) {
+                        const itemPath = getItemPath(items[i]);
+                        if (itemPath !== currentPath) {
+                            navigateToIndex(i);
+                            return;
+                        }
+                    }
+
+                    // If no different path found, wrap to beginning
+                    for (let i = 0; i < currentIndex; i++) {
+                        const itemPath = getItemPath(items[i]);
+                        if (itemPath !== currentPath) {
+                            navigateToIndex(i);
+                            return;
+                        }
+                    }
+                }
+
+                // Navigate to Previous Path
+                function navigateToPreviousPath() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    const currentPath = getItemPath(current);
+
+                    // Find the previous item with a different path
+                    for (let i = currentIndex - 1; i >= 0; i--) {
+                        const itemPath = getItemPath(items[i]);
+                        if (itemPath !== currentPath) {
+                            // Find the first item of this different path
+                            let firstOfPath = i;
+                            for (let j = i - 1; j >= 0; j--) {
+                                if (getItemPath(items[j]) === itemPath) {
+                                    firstOfPath = j;
+                                } else {
+                                    break;
+                                }
+                            }
+                            navigateToIndex(firstOfPath);
+                            return;
+                        }
+                    }
+
+                    // If no different path found, wrap to end
+                    for (let i = items.length - 1; i > currentIndex; i--) {
+                        const itemPath = getItemPath(items[i]);
+                        if (itemPath !== currentPath) {
+                            // Find the first item of this different path
+                            let firstOfPath = i;
+                            for (let j = i - 1; j > currentIndex; j--) {
+                                if (getItemPath(items[j]) === itemPath) {
+                                    firstOfPath = j;
+                                } else {
+                                    break;
+                                }
+                            }
+                            navigateToIndex(firstOfPath);
+                            return;
+                        }
+                    }
+                }
+
+                // Navigate to First Item in Current Path
+                function navigateToFirstInPath() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    const currentPath = getItemPath(current);
+
+                    // Find the first item with the same path
+                    for (let i = 0; i < items.length; i++) {
+                        const itemPath = getItemPath(items[i]);
+                        if (itemPath === currentPath) {
+                            navigateToIndex(i);
+                            return;
+                        }
+                    }
+                }
+
+                // Navigate to Last Item in Current Path
+                function navigateToLastInPath() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    const currentPath = getItemPath(current);
+
+                    // Find the last item with the same path
+                    for (let i = items.length - 1; i >= 0; i--) {
+                        const itemPath = getItemPath(items[i]);
+                        if (itemPath === currentPath) {
+                            navigateToIndex(i);
+                            return;
+                        }
+                    }
+                }
+
                 // Random Item
                 function navigateToRandom() {
                     if (items.length === 0) {
@@ -466,6 +589,22 @@
                         case " ":
                             e.preventDefault();
                             toggleCurrentVideo();
+                            break;
+                        case "pagedown":
+                            e.preventDefault();
+                            navigateToNextPath();
+                            break;
+                        case "pageup":
+                            e.preventDefault();
+                            navigateToPreviousPath();
+                            break;
+                        case "home":
+                            e.preventDefault();
+                            navigateToFirstInPath();
+                            break;
+                        case "end":
+                            e.preventDefault();
+                            navigateToLastInPath();
                             break;
                     }
                 });
