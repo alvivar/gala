@@ -182,6 +182,11 @@
                                 current = entry.target;
                                 currentIndex = items.indexOf(entry.target);
 
+                                // Log current media being shown
+                                const filename =
+                                    current.getAttribute("data-filename");
+                                console.log(filename || "Unknown");
+
                                 // Load media in range when this item becomes current
                                 loadMediaInRange(currentIndex);
 
