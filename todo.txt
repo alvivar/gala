@@ -1,13 +1,17 @@
 To do
 
-    - Should auto-close when all "clients" are disconnected?
+    - Should auto-close when all clients are disconnected?
     - Maybe instead of just pressing X to delete, hold it for a couple of seconds to confirm?
 
 Done
 
     17 September 2025
     - Readability +1
-    - Lazy loading for images and videos.
+    - Lazy loading for images and videos
+    - Page down: goes to the next path
+    - Page up: goes to the previous path
+    - Home: goes to the first image
+    - End: goes to the last image
 
     26 August 2025
-    - A remake of Qpost, incredibly simple.
+    - A remake of Qpost, incredibly simple
