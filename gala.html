@@ -55,6 +55,49 @@
                 color: inherit;
                 text-decoration: none;
             }
+            .lazy-image,
+            .lazy-video {
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                background: #222;
+            }
+            .lazy-image.loading,
+            .lazy-video.loading {
+                opacity: 0.5;
+            }
+            .lazy-image.loaded,
+            .lazy-video.loaded {
+                opacity: 1;
+            }
+            .lazy-image::before,
+            .lazy-video::before {
+                content: "";
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 20px;
+                height: 20px;
+                margin: -10px 0 0 -10px;
+                border: 2px solid #555;
+                border-top: 2px solid #fff;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                z-index: 1;
+            }
+            .lazy-image.loaded::before,
+            .lazy-image.error::before,
+            .lazy-video.loaded::before,
+            .lazy-video.error::before {
+                display: none;
+            }
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
         </style>
     </head>
     <body>
@@ -70,6 +113,81 @@
                 let remainingItems = [...Array(items.length).keys()];
                 let viewedItems = new Set();
 
+                // Lazy Loading Functions
+
+                function loadImage(img) {
+                    if (img.src || !img.dataset.src) {
+                        return Promise.resolve();
+                    }
+
+                    return new Promise((resolve, reject) => {
+                        img.classList.add("loading");
+
+                        const tempImg = new Image();
+                        tempImg.onload = () => {
+                            img.src = img.dataset.src;
+                            img.classList.remove("loading");
+                            img.classList.add("loaded");
+                            resolve();
+                        };
+                        tempImg.onerror = () => {
+                            img.classList.remove("loading");
+                            img.classList.add("error");
+                            reject(new Error("Failed to load image"));
+                        };
+                        tempImg.src = img.dataset.src;
+                    });
+                }
+
+                function loadVideo(video) {
+                    if (video.src || !video.dataset.src) {
+                        return Promise.resolve();
+                    }
+
+                    return new Promise((resolve, reject) => {
+                        video.classList.add("loading");
+
+                        video.onloadeddata = () => {
+                            video.classList.remove("loading");
+                            video.classList.add("loaded");
+                            video.onloadeddata = null;
+                            video.onerror = null;
+                            resolve();
+                        };
+                        video.onerror = () => {
+                            video.classList.remove("loading");
+                            video.classList.add("error");
+                            video.onloadeddata = null;
+                            video.onerror = null;
+                            reject(new Error("Failed to load video"));
+                        };
+
+                        video.src = video.dataset.src;
+                        video.load();
+                    });
+                }
+
+                function loadMediaInRange(centerIndex, range = 2) {
+                    const startIndex = Math.max(0, centerIndex - range);
+                    const endIndex = Math.min(
+                        items.length - 1,
+                        centerIndex + range
+                    );
+
+                    for (let i = startIndex; i <= endIndex; i++) {
+                        const item = items[i];
+                        const img = item.querySelector(".lazy-image");
+                        const video = item.querySelector(".lazy-video");
+
+                        if (img && !img.src) {
+                            loadImage(img).catch(() => {});
+                        }
+                        if (video && !video.src) {
+                            loadVideo(video).catch(() => {});
+                        }
+                    }
+                }
+
                 // Intersection Observer
 
                 const observer = new IntersectionObserver(
@@ -84,11 +202,15 @@
                                 current = entry.target;
                                 currentIndex = items.indexOf(entry.target);
 
-                                if (video) {
-                                    video.play();
+                                // Load media in range when this item becomes current
+                                loadMediaInRange(currentIndex);
+
+                                // Only try to play video if it has been loaded
+                                if (video && video.src) {
+                                    video.play().catch(() => {});
                                 }
                             } else {
-                                if (video && !video.paused) {
+                                if (video && video.src && !video.paused) {
                                     video.pause();
                                     video.muted = true;
                                 }
@@ -101,6 +223,11 @@
                 items.forEach((item, index) => {
                     observer.observe(item);
                 });
+
+                // Initial load - load the first few media items immediately
+                if (items.length > 0) {
+                    loadMediaInRange(0);
+                }
 
                 // Utility Functions
 
@@ -128,6 +255,9 @@
                         history.push(currentIndex);
                     }
 
+                    // Preload media around the target before scrolling
+                    loadMediaInRange(targetIndex);
+
                     items[targetIndex].scrollIntoView({
                         behavior: "smooth",
                         block: "start",
@@ -146,8 +276,18 @@
                         return;
                     }
 
+                    // Load video first if not loaded yet
+                    if (!video.src && video.dataset.src) {
+                        loadVideo(video)
+                            .then(() => {
+                                video.play().catch(() => {});
+                            })
+                            .catch(() => {});
+                        return;
+                    }
+
                     if (video.paused) {
-                        video.play();
+                        video.play().catch(() => {});
                     } else {
                         video.pause();
                     }
