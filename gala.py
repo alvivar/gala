@@ -40,7 +40,7 @@ def create_media_item_html(filename: str) -> str:
     else:
         media_tag = (
             f'<a href="{quoted_src}" target="_blank" rel="noopener">'
-            f'<img data-src="{quoted_src}" alt="{safe_name}" class="lazy-image" />'
+            f'<img data-src="{quoted_src}" alt="" class="lazy-image" />'
             f"</a>"
         )
 

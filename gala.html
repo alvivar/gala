@@ -67,56 +67,10 @@
                 text-decoration: none;
             }
 
-            /* Lazy Loading States */
+            /* Media Elements - No Loading States Needed */
             .lazy-image,
             .lazy-video {
-                opacity: 0;
-                transition: opacity 0.3s ease;
-                background: #222;
-            }
-
-            .lazy-image.loading,
-            .lazy-video.loading {
-                opacity: 0.5;
-            }
-
-            .lazy-image.loaded,
-            .lazy-video.loaded {
-                opacity: 1;
-            }
-
-            /* Loading Spinner */
-            .lazy-image::before,
-            .lazy-video::before {
-                content: "";
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                width: 20px;
-                height: 20px;
-                margin: -10px 0 0 -10px;
-                border: 2px solid #555;
-                border-top: 2px solid #fff;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-                z-index: 1;
-            }
-
-            .lazy-image.loaded::before,
-            .lazy-image.error::before,
-            .lazy-video.loaded::before,
-            .lazy-video.error::before {
-                display: none;
-            }
-
-            /* Spinner Animation */
-            @keyframes spin {
-                0% {
-                    transform: rotate(0deg);
-                }
-                100% {
-                    transform: rotate(360deg);
-                }
+                background: #000;
             }
         </style>
     </head>
