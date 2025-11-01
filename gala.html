@@ -157,11 +157,11 @@
                         const img = item.querySelector(".lazy-image");
                         const video = item.querySelector(".lazy-video");
 
-                        if (img && !img.src) {
+                        if (img && !img.classList.contains("loaded")) {
                             loadImage(img).catch(() => {});
                         }
 
-                        if (video && !video.src) {
+                        if (video && !video.classList.contains("loaded")) {
                             loadVideo(video).catch(() => {});
                         }
                     }
@@ -210,11 +210,18 @@
 
                                 loadMediaInRange(currentIndex);
 
-                                if (video && video.src) {
+                                if (
+                                    video &&
+                                    video.classList.contains("loaded")
+                                ) {
                                     video.play().catch(() => {});
                                 }
                             } else {
-                                if (video && video.src && !video.paused) {
+                                if (
+                                    video &&
+                                    video.classList.contains("loaded") &&
+                                    !video.paused
+                                ) {
                                     video.pause();
                                     video.muted = true;
                                 }
@@ -275,7 +282,10 @@
                         return;
                     }
 
-                    if (!video.src && video.dataset.src) {
+                    if (
+                        !video.classList.contains("loaded") &&
+                        video.dataset.src
+                    ) {
                         loadVideo(video)
                             .then(() => {
                                 video.play().catch(() => {});
