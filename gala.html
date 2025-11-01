@@ -82,7 +82,11 @@
 
                 // Lazy Loading
                 function loadImage(img) {
-                    if (img.src || !img.dataset.src) {
+                    if (
+                        img.classList.contains("loaded") ||
+                        img.classList.contains("loading") ||
+                        !img.dataset.src
+                    ) {
                         return Promise.resolve();
                     }
 
@@ -109,7 +113,11 @@
                 }
 
                 function loadVideo(video) {
-                    if (video.src || !video.dataset.src) {
+                    if (
+                        video.classList.contains("loaded") ||
+                        video.classList.contains("loading") ||
+                        !video.dataset.src
+                    ) {
                         return Promise.resolve();
                     }
 
@@ -155,6 +163,35 @@
 
                         if (video && !video.src) {
                             loadVideo(video).catch(() => {});
+                        }
+                    }
+
+                    unloadMediaOutOfRange(centerIndex);
+                }
+
+                function unloadMediaOutOfRange(centerIndex, keepRange = 5) {
+                    for (let i = 0; i < items.length; i++) {
+                        if (
+                            i >= centerIndex - keepRange &&
+                            i <= centerIndex + keepRange
+                        ) {
+                            continue;
+                        }
+
+                        const item = items[i];
+                        const img = item.querySelector(".lazy-image");
+                        const video = item.querySelector(".lazy-video");
+
+                        if (img && img.src && img.dataset.src) {
+                            img.src = "";
+                            img.classList.remove("loaded", "loading");
+                        }
+
+                        if (video && video.src && video.dataset.src) {
+                            video.pause();
+                            video.src = "";
+                            video.load();
+                            video.classList.remove("loaded", "loading");
                         }
                     }
                 }
