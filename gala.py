@@ -2,11 +2,13 @@ import argparse
 import html
 import json
 import os
+import shutil
 import sys
 import urllib.parse
 import webbrowser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from itertools import count
 from pathlib import Path
 
 
@@ -53,10 +55,11 @@ def load_html_template() -> str:
 
 
 def generate_gallery_html(files: list[str]) -> bytes:
-    if files:
-        items_html = "\n".join(create_media_item_html(filename) for filename in files)
-    else:
-        items_html = '<p style="padding:2rem;color:#aaa">No media files found.</p>'
+    items_html = (
+        "\n".join(create_media_item_html(filename) for filename in files)
+        if files
+        else '<p style="padding:2rem;color:#aaa">No media files found.</p>'
+    )
 
     html_template = load_html_template()
     html_document = html_template.replace("{items_html}", items_html)
@@ -69,21 +72,21 @@ def save_path_to_history(path: str) -> None:
     existing_paths = []
     if history_file.exists():
         try:
-            content = history_file.read_text(encoding="utf-8").strip()
-            if content:
-                existing_paths = [p for p in content.split("\n") if p.strip()]
-        except Exception:
+            existing_paths = [
+                p
+                for p in history_file.read_text(encoding="utf-8").splitlines()
+                if p.strip()
+            ]
+        except OSError:
             pass
 
-    try:
+    if path in existing_paths:
         existing_paths.remove(path)
-    except ValueError:
-        pass
-
     updated_paths = [path] + existing_paths
+
     try:
         history_file.write_text("\n".join(updated_paths) + "\n", encoding="utf-8")
-    except Exception:
+    except OSError:
         pass
 
 
@@ -99,12 +102,13 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_DELETE(self) -> None:
-        if urllib.parse.urlparse(self.path).path != "/api/delete":
+        parsed_url = urllib.parse.urlparse(self.path)
+        if parsed_url.path != "/api/delete":
             self.send_error(404, "Not Found")
             return
 
-        query_params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        filename = (query_params.get("name") or [""])[0]
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        filename = next(iter(query_params.get("name", [])), "")
         self._delete_file(filename)
 
     def _serve_gallery(self) -> None:
@@ -120,7 +124,20 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         file_path = (self.base_dir / urllib.parse.unquote(filename)).resolve()
 
         try:
-            file_path.unlink()
+            relative_path = file_path.relative_to(self.base_dir)
+
+            deleted_dir = self.base_dir / "deleted"
+            destination = deleted_dir / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+
+            if destination.exists():
+                stem, suffix = file_path.stem, file_path.suffix
+                for i in count(1):
+                    destination = destination.parent / f"{stem}_{i}{suffix}"
+                    if not destination.exists():
+                        break
+
+            shutil.move(file_path, destination)
             self._send_json(200, {"ok": True})
         except FileNotFoundError:
             self._send_json(404, {"ok": False, "error": "File not found"})
