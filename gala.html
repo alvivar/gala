@@ -176,7 +176,8 @@
                         return;
                     }
 
-                    const isCurrentItem = video.closest(".item") === currentItem;
+                    const isCurrentItem =
+                        video.closest(".item") === currentItem;
                     applyVideoMuteState(video, isCurrentItem);
 
                     if (video.classList.contains("loaded")) {
@@ -396,7 +397,10 @@
                                     if (previousItem) {
                                         const { video: previousVideo } =
                                             getMediaElements(previousItem);
-                                        applyVideoMuteState(previousVideo, false);
+                                        applyVideoMuteState(
+                                            previousVideo,
+                                            false,
+                                        );
                                     }
                                 } else {
                                     currentItem = entry.target;
@@ -408,7 +412,10 @@
                         }
 
                         if (video) {
-                            if (video.classList.contains("loaded") && !video.paused) {
+                            if (
+                                video.classList.contains("loaded") &&
+                                !video.paused
+                            ) {
                                 video.pause();
                             }
                             applyVideoMuteState(video, false);
@@ -607,112 +614,108 @@
                 // -----------------------------------------------------------------
                 // Favorites + deletion
                 // -----------------------------------------------------------------
-                async function favoriteCurrent() {
-                    if (!currentItem) {
-                        return;
-                    }
-
-                    const filename = currentItem.getAttribute("data-filename");
-                    if (!filename) {
-                        return;
-                    }
-
+                async function sendMediaActionRequest(
+                    path,
+                    method,
+                    actionLabel,
+                ) {
                     try {
-                        const response = await fetch(
-                            "/api/favorite?name=" + encodeURIComponent(filename),
-                            { method: "POST" },
-                        );
-
+                        const response = await fetch(path, { method });
                         const data = await response.json().catch(() => ({}));
+
                         if (!response.ok || !data.ok) {
                             const errorMessage = data.error
                                 ? ": " + data.error
                                 : "";
-                            alert("Favorite failed" + errorMessage);
+                            alert(actionLabel + " failed" + errorMessage);
+                            return null;
                         }
+
+                        return data;
                     } catch (error) {
-                        alert("Favorite failed: " + error);
+                        alert(actionLabel + " failed: " + error);
+                        return null;
                     }
                 }
 
-                async function deleteCurrent() {
-                    if (!currentItem) {
-                        return;
-                    }
+                function getCurrentFilename() {
+                    return currentItem?.getAttribute("data-filename") || "";
+                }
 
-                    const filename = currentItem.getAttribute("data-filename");
+                async function favoriteCurrent() {
+                    const filename = getCurrentFilename();
                     if (!filename) {
                         return;
                     }
 
-                    try {
-                        const response = await fetch(
-                            "/api/delete?name=" + encodeURIComponent(filename),
-                            { method: "DELETE" },
-                        );
+                    await sendMediaActionRequest(
+                        "/api/favorite?name=" + encodeURIComponent(filename),
+                        "POST",
+                        "Favorite",
+                    );
+                }
 
-                        const data = await response.json().catch(() => ({}));
-                        if (!response.ok || !data.ok) {
-                            const errorMessage = data.error
-                                ? ": " + data.error
-                                : "";
-                            alert("Delete failed" + errorMessage);
-                            return;
-                        }
-
-                        const { video } = getMediaElements(currentItem);
-                        if (video) {
-                            try {
-                                video.pause();
-                                video.src = "";
-                            } catch (e) {}
-                        }
-
-                        const removedItem = currentItem;
-                        observer.unobserve(removedItem);
-
-                        const removedIndex = items.indexOf(removedItem);
-                        removedItem.remove();
-
-                        if (removedIndex !== -1) {
-                            items.splice(removedIndex, 1);
-
-                            randomPool = randomPool
-                                .map((idx) =>
-                                    idx > removedIndex ? idx - 1 : idx,
-                                )
-                                .filter((idx) => idx !== removedIndex);
-
-                            navigationHistory = navigationHistory
-                                .map((idx) =>
-                                    idx > removedIndex ? idx - 1 : idx,
-                                )
-                                .filter((idx) => idx !== removedIndex);
-                        }
-
-                        if (items.length === 0) {
-                            resetMediaWindow();
-                            currentItem = null;
-                            currentIndex = 0;
-                            document.body.innerHTML =
-                                '<p style="padding:2rem;color:#aaa">No media files remain.</p>';
-                            return;
-                        }
-
-                        const targetItem = findClosestToCenter() || items[0];
-                        targetItem.scrollIntoView({
-                            behavior: "auto",
-                            block: "start",
-                        });
-
-                        const targetIndex = items.indexOf(targetItem);
-                        setCurrentByIndex(targetIndex === -1 ? 0 : targetIndex);
-
-                        resetMediaWindow();
-                        updateMediaWindow(currentIndex);
-                    } catch (error) {
-                        alert("Delete failed: " + error);
+                async function deleteCurrent() {
+                    const filename = getCurrentFilename();
+                    if (!filename) {
+                        return;
                     }
+
+                    const result = await sendMediaActionRequest(
+                        "/api/delete?name=" + encodeURIComponent(filename),
+                        "DELETE",
+                        "Delete",
+                    );
+                    if (!result) {
+                        return;
+                    }
+
+                    const { video } = getMediaElements(currentItem);
+                    if (video) {
+                        try {
+                            video.pause();
+                            video.src = "";
+                        } catch (e) {}
+                    }
+
+                    const removedItem = currentItem;
+                    observer.unobserve(removedItem);
+
+                    const removedIndex = items.indexOf(removedItem);
+                    removedItem.remove();
+
+                    if (removedIndex !== -1) {
+                        items.splice(removedIndex, 1);
+
+                        randomPool = randomPool
+                            .map((idx) => (idx > removedIndex ? idx - 1 : idx))
+                            .filter((idx) => idx !== removedIndex);
+
+                        navigationHistory = navigationHistory
+                            .map((idx) => (idx > removedIndex ? idx - 1 : idx))
+                            .filter((idx) => idx !== removedIndex);
+                    }
+
+                    if (items.length === 0) {
+                        resetMediaWindow();
+                        currentItem = null;
+                        currentIndex = 0;
+                        document.body.innerHTML =
+                            '<p style="padding:2rem;color:#aaa">No media files remain.</p>';
+                        return;
+                    }
+
+                    const targetItem = findClosestToCenter() || items[0];
+                    targetItem.scrollIntoView({
+                        behavior: "auto",
+                        block: "start",
+                    });
+
+                    const targetIndex = items.indexOf(targetItem);
+                    setCurrentByIndex(targetIndex === -1 ? 0 : targetIndex);
+
+                    resetMediaWindow();
+                    updateMediaWindow(currentIndex);
                 }
 
                 // -----------------------------------------------------------------
