@@ -170,6 +170,27 @@
                     });
                 }
 
+                function autoplayVisibleVideo(video) {
+                    if (!video) {
+                        return;
+                    }
+
+                    video.muted = true;
+
+                    if (video.classList.contains("loaded")) {
+                        video.play().catch(() => {});
+                        return;
+                    }
+
+                    if (video.dataset.src) {
+                        loadVideo(video)
+                            .then(() => {
+                                video.play().catch(() => {});
+                            })
+                            .catch(() => {});
+                    }
+                }
+
                 function getMediaElements(item) {
                     return {
                         image: item.querySelector(".lazy-image"),
@@ -348,9 +369,7 @@
                                 }
                             }
 
-                            if (video && video.classList.contains("loaded")) {
-                                video.play().catch(() => {});
-                            }
+                            autoplayVisibleVideo(video);
                             return;
                         }
 
