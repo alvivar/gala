@@ -605,8 +605,36 @@
                 }
 
                 // -----------------------------------------------------------------
-                // Deletion
+                // Favorites + deletion
                 // -----------------------------------------------------------------
+                async function favoriteCurrent() {
+                    if (!currentItem) {
+                        return;
+                    }
+
+                    const filename = currentItem.getAttribute("data-filename");
+                    if (!filename) {
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(
+                            "/api/favorite?name=" + encodeURIComponent(filename),
+                            { method: "POST" },
+                        );
+
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.ok) {
+                            const errorMessage = data.error
+                                ? ": " + data.error
+                                : "";
+                            alert("Favorite failed" + errorMessage);
+                        }
+                    } catch (error) {
+                        alert("Favorite failed: " + error);
+                    }
+                }
+
                 async function deleteCurrent() {
                     if (!currentItem) {
                         return;
@@ -703,6 +731,10 @@
                     const key = event.key.toLowerCase();
 
                     switch (key) {
+                        case "f":
+                            event.preventDefault();
+                            favoriteCurrent();
+                            break;
                         case "x":
                             event.preventDefault();
                             deleteCurrent();

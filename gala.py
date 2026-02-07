@@ -16,6 +16,8 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}
 VIDEO_EXTENSIONS = {".webm", ".mp4"}
 ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 DELETED_DIR_NAME = "deleted"
+FAVORITES_DIR_NAME = "favorites"
+EXCLUDED_MEDIA_DIR_NAMES = {DELETED_DIR_NAME, FAVORITES_DIR_NAME}
 HISTORY_FILE = Path("history.txt")
 HTML_TEMPLATE_FILE = "gala.html"
 NO_MEDIA_HTML = '<p style="padding:2rem;color:#aaa">No media files found.</p>'
@@ -25,8 +27,11 @@ def is_supported_media_file(path: Path) -> bool:
     return path.is_file() and path.suffix.lower() in ALLOWED_EXTENSIONS
 
 
-def is_in_deleted_folder(relative_path: Path) -> bool:
-    return bool(relative_path.parts) and relative_path.parts[0] == DELETED_DIR_NAME
+def is_in_excluded_media_folder(relative_path: Path) -> bool:
+    return (
+        bool(relative_path.parts)
+        and relative_path.parts[0] in EXCLUDED_MEDIA_DIR_NAMES
+    )
 
 
 def list_media_files(base_dir: Path) -> list[str]:
@@ -37,7 +42,7 @@ def list_media_files(base_dir: Path) -> list[str]:
                 continue
 
             relative_path = entry.relative_to(base_dir)
-            if is_in_deleted_folder(relative_path):
+            if is_in_excluded_media_folder(relative_path):
                 continue
 
             media_files.append(relative_path.as_posix())
@@ -133,6 +138,16 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         filename = next(iter(query_params.get("name", [])), "")
         self._delete_file(filename)
 
+    def do_POST(self) -> None:
+        parsed_url = urllib.parse.urlparse(self.path)
+        if parsed_url.path != "/api/favorite":
+            self.send_error(404, "Not Found")
+            return
+
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        filename = next(iter(query_params.get("name", [])), "")
+        self._favorite_file(filename)
+
     def _serve_gallery(self) -> None:
         files = list_media_files(self.base_dir)
         content = generate_gallery_html(files)
@@ -158,6 +173,43 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         except Exception as error:
             self._send_json(500, {"ok": False, "error": str(error)})
 
+    def _favorite_file(self, filename: str) -> None:
+        if not filename:
+            self._send_json(400, {"ok": False, "error": "Missing filename"})
+            return
+
+        try:
+            source_file, relative_path = self._resolve_source_file(filename)
+
+            if is_in_excluded_media_folder(relative_path):
+                self._send_json(400, {"ok": False, "error": "Invalid file path"})
+                return
+
+            if not source_file.exists() or not source_file.is_file():
+                self._send_json(404, {"ok": False, "error": "File not found"})
+                return
+
+            if source_file.suffix.lower() not in ALLOWED_EXTENSIONS:
+                self._send_json(
+                    400,
+                    {
+                        "ok": False,
+                        "error": "Only supported media files can be favorited",
+                    },
+                )
+                return
+
+            destination = self._build_favorite_destination(relative_path)
+            overwritten = destination.exists()
+            shutil.copy2(source_file, destination)
+            self._send_json(200, {"ok": True, "overwritten": overwritten})
+        except ValueError:
+            self._send_json(403, {"ok": False, "error": "Invalid file path"})
+        except PermissionError:
+            self._send_json(403, {"ok": False, "error": "Permission denied"})
+        except Exception as error:
+            self._send_json(500, {"ok": False, "error": str(error)})
+
     def _resolve_source_file(self, filename: str) -> tuple[Path, Path]:
         source_file = (self.base_dir / urllib.parse.unquote(filename)).resolve()
         relative_path = source_file.relative_to(self.base_dir)
@@ -178,6 +230,12 @@ class GalleryHandler(SimpleHTTPRequestHandler):
                 return candidate
 
         raise RuntimeError("Could not determine destination filename")
+
+    def _build_favorite_destination(self, relative_path: Path) -> Path:
+        favorites_dir = self.base_dir / FAVORITES_DIR_NAME
+        destination = favorites_dir / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        return destination
 
     def _send_response(self, status: int, content_type: str, content: bytes) -> None:
         self.send_response(status)
