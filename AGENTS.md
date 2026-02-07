@@ -2,102 +2,125 @@
 
 ## Project overview
 
-**Gala** is a small, dependency-free Python web app that serves a fullscreen, scroll-snap media gallery for a directory tree.
+**Gala** is a small, dependency-free Python web gallery server.
 
 - Backend: `gala.py` (Python stdlib only)
-- Frontend template: `gala.html` (inline CSS + vanilla JS)
-- No build step, no package manager, no tests currently
+- Frontend template + app logic: `gala.html` (inline CSS + vanilla JS)
+- No package manager, no build step, no test suite
 
-Primary workflow: run `gala.py`, browse media, navigate with keyboard, optionally delete items.
+Primary workflow: run `gala.py`, browse media in the browser, navigate with keyboard, optionally move files to `deleted/`.
 
 ---
 
-## Tech stack and constraints
+## Tech constraints
 
 - Python **3.10+**
-- Standard library only (`http.server`, `pathlib`, `argparse`, etc.)
-- No external JS/CSS dependencies
-- Intended to stay lightweight and simple
-
-If adding features, prefer stdlib + plain JS and avoid introducing frameworks/toolchains unless explicitly requested.
+- Standard library only
+- Keep implementation lightweight and simple
+- Prefer small, surgical edits over large rewrites unless requested
 
 ---
 
 ## Repository map
 
-- `gala.py` — server, media discovery, HTML generation, delete API, CLI
-- `gala.html` — gallery template and all client-side behavior
-- `README.md` — user docs (note: currently partially out of sync with implementation)
-- `todo.txt` — informal backlog
-- `history.txt` — local run history (ignored in git)
+- `gala.py` — CLI, HTTP server, media scanning, HTML generation, delete API
+- `gala.html` — viewer UI + navigation + lazy loading + autoplay + delete UX
+- `README.md` — user-facing docs
+- `todo.txt` — informal notes
+- `history.txt` — run history for non-default paths (gitignored)
 - `.gitignore` — currently ignores `history.txt`
 
 ---
 
-## How to run
+## Runtime / CLI
 
 ```bash
 python gala.py [DIRECTORY] [--host HOST] [--port PORT] [--no-open]
 ```
 
 Defaults:
-
-- `DIRECTORY=.`
-- `--host 127.0.0.1`
-- `--port 8000`
-- Browser auto-opens unless `--no-open`
-
-Stop with `Ctrl+C`.
+- directory: `.`
+- host: `127.0.0.1`
+- port: `8000`
+- browser opens automatically unless `--no-open`
 
 ---
 
 ## Backend behavior (`gala.py`)
 
-### Media scanning
+### Media discovery
 
-- Uses recursive `Path.rglob("*")`
-- Allowed extensions are controlled by:
-    - `IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}`
-    - `VIDEO_EXTENSIONS = {".webm", ".mp4"}`
-- Combined as `ALLOWED_EXTENSIONS`
-- Returns sorted relative POSIX-style paths
+- Recursive scan via `Path.rglob("*")`
+- Allowed extensions:
+  - `IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}`
+  - `VIDEO_EXTENSIONS = {".webm", ".mp4"}`
+  - `ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS`
+- Returns sorted relative POSIX paths
+- Files under `<base_dir>/deleted/**` are excluded from listings
 
 ### Routes
 
-- `GET /` → rendered gallery HTML (`gala.html` + `{items_html}` substitution)
-- Static files/media served by `SimpleHTTPRequestHandler`
-- `DELETE /api/delete?name=<relative-path>` → moves a file into `deleted/` under served base dir
+- `GET /` (and `GET /?query`) → gallery HTML
+- static files/media → served by `SimpleHTTPRequestHandler`
+- `DELETE /api/delete?name=<relative-path>` → move file into `deleted/`
 
-### Delete semantics
+### Delete behavior
 
-- File path is URL-decoded, resolved, and validated via `relative_to(base_dir)`
-- Instead of permanent deletion, file is moved to:
-    - `<base_dir>/deleted/<original-relative-path>`
-- Name collisions in `deleted/` are resolved as `stem_1.ext`, `stem_2.ext`, etc.
+- Request path is URL-decoded and resolved under `base_dir`
+- Path escapes are blocked with `relative_to(base_dir)`
+- Move target: `<base_dir>/deleted/<relative-path>`
+- Name collisions become `stem_1.ext`, `stem_2.ext`, ...
 
-### Persistence
+### Delete API status behavior
 
-- When run with a non-default directory arg (`args.directory != "."`), absolute path is prepended to `history.txt`
-- `history.txt` is best-effort; read/write failures are ignored
+- `200` success: `{ "ok": true }`
+- `400` missing filename
+- `403` invalid file path or permission denied
+- `404` file not found
+- `500` unexpected error
+
+### Other persistence
+
+- Non-default launch paths are prepended to `history.txt` (best-effort read/write)
 
 ---
 
 ## Frontend behavior (`gala.html`)
 
-### Rendering and loading
+### Viewer model
 
-- One `.item` per viewport (`100vh`), vertical scroll-snap
-- Lazy-loading for images/videos around current index
-- Media outside a range is unloaded to reduce memory
-- `IntersectionObserver` updates current item and auto-plays visible loaded video
+- One item per viewport (`100vh`) with vertical scroll snap
+- Lazy load images/videos near current index
+- Unload media outside keep window to reduce memory
+- Uses `IntersectionObserver` to track visible/current item
 
-### Keyboard controls (as implemented)
+### Media window strategy
+
+Current implementation is diff-based (not full list scans each update):
+- load radius: `LOAD_RADIUS = 2`
+- keep radius: `KEEP_RADIUS = 5`
+- tracks `keptStart` / `keptEnd`
+- unloads only indices that leave previous keep window
+
+### Video autoplay and audio
+
+- Visible videos attempt autoplay
+- If visible video is not loaded yet, it is loaded first, then autoplay is attempted
+- Non-visible videos are paused and muted
+- Audio toggle with `m`:
+  - `unmutedMode = true` means only current/visible video can be unmuted
+  - previous/non-current videos remain muted
+
+> Note: browsers may still block unmuted autoplay based on autoplay policy.
+
+### Keyboard shortcuts
 
 - `j` → next item
 - `k` → previous item
-- `n` → random unviewed item (cycles through all)
+- `n` → random item from remaining pool (cycles before reset)
 - `b` → back in navigation history
-- `Space` → toggle play/pause on current video
+- `Space` → play/pause current video
+- `m` → toggle audio mode (muted/unmuted mode)
 - `x` → delete current item (calls `DELETE /api/delete`)
 - `h` / `PageDown` → next path/group
 - `l` / `PageUp` → previous path/group
@@ -106,44 +129,25 @@ Stop with `Ctrl+C`.
 
 ---
 
-## Important doc/code mismatches
+## Guidance for future agents
 
-`README.md` appears stale relative to current code:
-
-- README mentions `GET /api/list` and `POST /api/delete` but code currently implements only `DELETE /api/delete`.
-- README says delete removes from disk immediately; current code moves files to a `deleted/` folder.
-- README shortcut list omits newer path-navigation keys (`h/l/u/i`, PgUp/PgDn/Home/End).
-
-If you change behavior, update both code and README to keep them aligned.
-
----
-
-## Known quirks / gotchas
-
-- Because media scan is recursive from base dir, files moved into `deleted/` still match extension filters and can reappear on refresh.
-- Template injection relies on exact `{items_html}` token in `gala.html`.
-- Paths in DOM use URL-encoded POSIX style; delete API expects that encoded `data-filename` value.
-
----
-
-## Guidance for future AI/code agents
-
-1. **Read both `gala.py` and `gala.html` before changes** (logic is split across backend/frontend).
-2. Keep implementation minimal and dependency-free unless user asks otherwise.
-3. Preserve keyboard-first workflow and performance (lazy loading, unload strategy).
-4. Be careful with path/security logic in delete handling (`resolve()` + `relative_to(base_dir)`).
-5. When adding/changing shortcuts or API endpoints, update docs (`README.md`) in the same change.
-6. Prefer small, surgical edits; this project is intentionally compact.
+1. Read **both** `gala.py` and `gala.html` before making changes.
+2. Keep dependency-free architecture.
+3. Preserve keyboard-first workflow.
+4. Preserve path safety in delete handling (`resolve()` + `relative_to(base_dir)`).
+5. If changing shortcuts, API, or delete semantics, update `README.md` in same change.
+6. Prefer simple logic over abstraction-heavy refactors.
 
 ---
 
 ## Manual verification checklist
 
-After modifications, manually verify:
+After changes, verify:
 
-1. Server starts and serves `GET /`.
-2. Images and videos load while scrolling.
-3. Video autoplay/pause behavior works when entering/leaving viewport.
-4. Keyboard shortcuts still work (item nav, random, back, path nav, play/pause).
-5. Delete action succeeds and UI updates correctly.
-6. Reload behavior is acceptable (especially around `deleted/` handling).
+1. `python gala.py` starts and serves `GET /`.
+2. `GET /?x=1` still serves gallery.
+3. Scroll loading/unloading works without major jank.
+4. Visible videos autoplay; off-screen videos pause.
+5. `m` toggles audio mode; only current video can be audible in unmuted mode.
+6. `x` moves files into `deleted/` and removed file does not reappear on refresh.
+7. Keyboard navigation (`j/k/n/b/h/l/u/i`, PgUp/PgDn/Home/End, Space) still works.
