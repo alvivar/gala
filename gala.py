@@ -103,7 +103,8 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(self.base_dir), **kwargs)
 
     def do_GET(self) -> None:
-        if self.path == "/":
+        parsed_url = urllib.parse.urlparse(self.path)
+        if parsed_url.path == "/":
             self._serve_gallery()
         else:
             super().do_GET()
