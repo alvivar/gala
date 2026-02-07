@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
     <head>
         <meta charset="utf-8" />
@@ -16,8 +16,14 @@
 
             body {
                 margin: 0;
-                font-family: system-ui, -apple-system, Segoe UI, Roboto,
-                    Helvetica, Arial, sans-serif;
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    Segoe UI,
+                    Roboto,
+                    Helvetica,
+                    Arial,
+                    sans-serif;
                 background: #111;
                 color: #eee;
             }
@@ -72,19 +78,35 @@
         <div class="grid">{items_html}</div>
         <script>
             (function () {
-                // State Management
+                // Constants
+                const LOAD_RADIUS = 2;
+                const KEEP_RADIUS = 5;
+                const VISIBILITY_RATIO = 0.6;
+                const OBSERVER_THRESHOLDS = [0, VISIBILITY_RATIO, 1];
+
+                // State
                 let items = Array.from(document.querySelectorAll(".item"));
-                let current = items[0] || null;
+                let currentItem = items[0] || null;
                 let currentIndex = 0;
-                let history = [];
-                let remainingItems = [...Array(items.length).keys()];
-                let viewedItems = new Set();
-                const LOAD_RANGE = 2;
-                const KEEP_RANGE = 5;
+                let navigationHistory = [];
+                let randomPool = createIndexPool(items.length);
+
+                // Media window state
                 let keptStart = -1;
                 let keptEnd = -1;
 
-                // Lazy Loading
+                const observer = new IntersectionObserver(handleIntersections, {
+                    threshold: OBSERVER_THRESHOLDS,
+                });
+
+                items.forEach((item) => observer.observe(item));
+                if (items.length > 0) {
+                    updateMediaWindow(0);
+                }
+
+                // -----------------------------------------------------------------
+                // Lazy loading helpers
+                // -----------------------------------------------------------------
                 function loadImage(img) {
                     if (
                         img.classList.contains("loaded") ||
@@ -98,7 +120,6 @@
                         img.classList.add("loading");
 
                         const tempImg = new Image();
-
                         tempImg.onload = () => {
                             img.src = img.dataset.src;
                             img.classList.remove("loading");
@@ -149,17 +170,22 @@
                     });
                 }
 
+                function getMediaElements(item) {
+                    return {
+                        image: item.querySelector(".lazy-image"),
+                        video: item.querySelector(".lazy-video"),
+                    };
+                }
+
                 function loadMediaAtIndex(index) {
-                    if (index < 0 || index >= items.length) {
+                    if (!isValidIndex(index)) {
                         return;
                     }
 
-                    const item = items[index];
-                    const img = item.querySelector(".lazy-image");
-                    const video = item.querySelector(".lazy-video");
+                    const { image, video } = getMediaElements(items[index]);
 
-                    if (img && !img.classList.contains("loaded")) {
-                        loadImage(img).catch(() => {});
+                    if (image && !image.classList.contains("loaded")) {
+                        loadImage(image).catch(() => {});
                     }
 
                     if (video && !video.classList.contains("loaded")) {
@@ -168,17 +194,15 @@
                 }
 
                 function unloadMediaAtIndex(index) {
-                    if (index < 0 || index >= items.length) {
+                    if (!isValidIndex(index)) {
                         return;
                     }
 
-                    const item = items[index];
-                    const img = item.querySelector(".lazy-image");
-                    const video = item.querySelector(".lazy-video");
+                    const { image, video } = getMediaElements(items[index]);
 
-                    if (img && img.src && img.dataset.src) {
-                        img.src = "";
-                        img.classList.remove("loaded", "loading");
+                    if (image && image.src && image.dataset.src) {
+                        image.src = "";
+                        image.classList.remove("loaded", "loading");
                     }
 
                     if (video && video.src && video.dataset.src) {
@@ -191,15 +215,20 @@
 
                 function updateMediaWindow(centerIndex) {
                     if (items.length === 0) {
-                        keptStart = -1;
-                        keptEnd = -1;
+                        resetMediaWindow();
                         return;
                     }
 
-                    const loadStart = Math.max(0, centerIndex - LOAD_RANGE);
-                    const loadEnd = Math.min(items.length - 1, centerIndex + LOAD_RANGE);
-                    const keepStart = Math.max(0, centerIndex - KEEP_RANGE);
-                    const keepEnd = Math.min(items.length - 1, centerIndex + KEEP_RANGE);
+                    const loadStart = Math.max(0, centerIndex - LOAD_RADIUS);
+                    const loadEnd = Math.min(
+                        items.length - 1,
+                        centerIndex + LOAD_RADIUS,
+                    );
+                    const keepStart = Math.max(0, centerIndex - KEEP_RADIUS);
+                    const keepEnd = Math.min(
+                        items.length - 1,
+                        centerIndex + KEEP_RADIUS,
+                    );
 
                     for (let i = loadStart; i <= loadEnd; i++) {
                         loadMediaAtIndex(i);
@@ -211,11 +240,19 @@
                         return;
                     }
 
-                    for (let i = keptStart; i <= Math.min(keepStart - 1, keptEnd); i++) {
+                    for (
+                        let i = keptStart;
+                        i <= Math.min(keepStart - 1, keptEnd);
+                        i++
+                    ) {
                         unloadMediaAtIndex(i);
                     }
 
-                    for (let i = Math.max(keepEnd + 1, keptStart); i <= keptEnd; i++) {
+                    for (
+                        let i = Math.max(keepEnd + 1, keptStart);
+                        i <= keptEnd;
+                        i++
+                    ) {
                         unloadMediaAtIndex(i);
                     }
 
@@ -228,63 +265,26 @@
                     keptEnd = -1;
                 }
 
-                const observer = new IntersectionObserver(
-                    (entries) => {
-                        entries.forEach((entry) => {
-                            const video = entry.target.querySelector("video");
-                            const isVisible =
-                                entry.isIntersecting &&
-                                entry.intersectionRatio > 0.6 - 0.01;
-
-                            if (isVisible) {
-                                const newIndex = items.indexOf(entry.target);
-                                if (newIndex !== -1) {
-                                    current = entry.target;
-                                    if (newIndex !== currentIndex) {
-                                        currentIndex = newIndex;
-                                        updateMediaWindow(currentIndex);
-                                    }
-                                }
-
-                                if (
-                                    video &&
-                                    video.classList.contains("loaded")
-                                ) {
-                                    video.play().catch(() => {});
-                                }
-                            } else {
-                                if (
-                                    video &&
-                                    video.classList.contains("loaded") &&
-                                    !video.paused
-                                ) {
-                                    video.pause();
-                                    video.muted = true;
-                                }
-                            }
-                        });
-                    },
-                    { threshold: [0, 0.6, 1] }
-                );
-
-                items.forEach((item) => {
-                    observer.observe(item);
-                });
-
-                if (items.length > 0) {
-                    updateMediaWindow(0);
+                // -----------------------------------------------------------------
+                // Core state helpers
+                // -----------------------------------------------------------------
+                function isValidIndex(index) {
+                    return index >= 0 && index < items.length;
                 }
 
-                // Utilities
+                function createIndexPool(length) {
+                    return [...Array(length).keys()];
+                }
+
                 function findClosestToCenter() {
-                    const center = innerHeight / 2;
+                    const centerY = window.innerHeight / 2;
                     let closest = null;
                     let minDistance = Infinity;
 
                     items.forEach((item) => {
                         const rect = item.getBoundingClientRect();
-                        const itemCenter = rect.top + rect.height / 2;
-                        const distance = Math.abs(itemCenter - center);
+                        const itemCenterY = rect.top + rect.height / 2;
+                        const distance = Math.abs(itemCenterY - centerY);
 
                         if (distance < minDistance) {
                             minDistance = distance;
@@ -295,25 +295,239 @@
                     return closest;
                 }
 
+                function setCurrentByIndex(index) {
+                    if (!isValidIndex(index)) {
+                        return;
+                    }
+
+                    currentIndex = index;
+                    currentItem = items[index];
+                }
+
+                function getItemPath(item) {
+                    if (!item) {
+                        return "";
+                    }
+
+                    const filename = item.getAttribute("data-filename");
+                    if (!filename) {
+                        return "";
+                    }
+
+                    const slashIndex = filename.lastIndexOf("/");
+                    const backslashIndex = filename.lastIndexOf("\\");
+                    const separatorIndex = Math.max(slashIndex, backslashIndex);
+
+                    return separatorIndex > -1
+                        ? filename.substring(0, separatorIndex)
+                        : "";
+                }
+
+                function pathAt(index) {
+                    return isValidIndex(index) ? getItemPath(items[index]) : "";
+                }
+
+                // -----------------------------------------------------------------
+                // Observer
+                // -----------------------------------------------------------------
+                function handleIntersections(entries) {
+                    entries.forEach((entry) => {
+                        const { video } = getMediaElements(entry.target);
+                        const isVisible =
+                            entry.isIntersecting &&
+                            entry.intersectionRatio > VISIBILITY_RATIO - 0.01;
+
+                        if (isVisible) {
+                            const newIndex = items.indexOf(entry.target);
+                            if (newIndex !== -1) {
+                                if (newIndex !== currentIndex) {
+                                    setCurrentByIndex(newIndex);
+                                    updateMediaWindow(currentIndex);
+                                } else {
+                                    currentItem = entry.target;
+                                }
+                            }
+
+                            if (video && video.classList.contains("loaded")) {
+                                video.play().catch(() => {});
+                            }
+                            return;
+                        }
+
+                        if (
+                            video &&
+                            video.classList.contains("loaded") &&
+                            !video.paused
+                        ) {
+                            video.pause();
+                            video.muted = true;
+                        }
+                    });
+                }
+
+                // -----------------------------------------------------------------
+                // Navigation
+                // -----------------------------------------------------------------
                 function navigateToIndex(targetIndex, addToHistory = true) {
+                    if (!isValidIndex(targetIndex)) {
+                        return;
+                    }
+
                     if (addToHistory && currentIndex !== targetIndex) {
-                        history.push(currentIndex);
+                        navigationHistory.push(currentIndex);
                     }
 
                     updateMediaWindow(targetIndex);
-
                     items[targetIndex].scrollIntoView({
                         behavior: "smooth",
                         block: "start",
                     });
                 }
 
-                function toggleCurrentVideo() {
-                    if (!current) {
+                function navigateToNext() {
+                    if (items.length === 0) {
                         return;
                     }
 
-                    const video = current.querySelector("video");
+                    const nextIndex = (currentIndex + 1) % items.length;
+                    navigateToIndex(nextIndex);
+                }
+
+                function navigateToPrevious() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    const previousIndex =
+                        (currentIndex - 1 + items.length) % items.length;
+                    navigateToIndex(previousIndex);
+                }
+
+                function navigateToNextPath() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    const currentPath = pathAt(currentIndex);
+
+                    for (let i = currentIndex + 1; i < items.length; i++) {
+                        if (pathAt(i) !== currentPath) {
+                            navigateToIndex(i);
+                            return;
+                        }
+                    }
+
+                    for (let i = 0; i < currentIndex; i++) {
+                        if (pathAt(i) !== currentPath) {
+                            navigateToIndex(i);
+                            return;
+                        }
+                    }
+                }
+
+                function findPathStart(index) {
+                    if (!isValidIndex(index)) {
+                        return -1;
+                    }
+
+                    const targetPath = pathAt(index);
+                    let start = index;
+                    while (start > 0 && pathAt(start - 1) === targetPath) {
+                        start -= 1;
+                    }
+                    return start;
+                }
+
+                function navigateToPreviousPath() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    const currentPath = pathAt(currentIndex);
+
+                    for (let i = currentIndex - 1; i >= 0; i--) {
+                        if (pathAt(i) !== currentPath) {
+                            navigateToIndex(findPathStart(i));
+                            return;
+                        }
+                    }
+
+                    for (let i = items.length - 1; i > currentIndex; i--) {
+                        if (pathAt(i) !== currentPath) {
+                            navigateToIndex(findPathStart(i));
+                            return;
+                        }
+                    }
+                }
+
+                function navigateToFirstInPath() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    const currentPath = pathAt(currentIndex);
+                    for (let i = 0; i < items.length; i++) {
+                        if (pathAt(i) === currentPath) {
+                            navigateToIndex(i);
+                            return;
+                        }
+                    }
+                }
+
+                function navigateToLastInPath() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    const currentPath = pathAt(currentIndex);
+                    for (let i = items.length - 1; i >= 0; i--) {
+                        if (pathAt(i) === currentPath) {
+                            navigateToIndex(i);
+                            return;
+                        }
+                    }
+                }
+
+                function navigateToRandom() {
+                    if (items.length === 0) {
+                        return;
+                    }
+
+                    if (randomPool.length === 0) {
+                        randomPool = createIndexPool(items.length);
+                    }
+
+                    const currentInPool = randomPool.indexOf(currentIndex);
+                    if (currentInPool !== -1) {
+                        randomPool.splice(currentInPool, 1);
+                    }
+
+                    if (randomPool.length === 0) {
+                        return;
+                    }
+
+                    const randomIndex = Math.floor(
+                        Math.random() * randomPool.length,
+                    );
+                    const targetIndex = randomPool[randomIndex];
+                    navigateToIndex(targetIndex);
+                }
+
+                function navigateBackward() {
+                    if (navigationHistory.length === 0) {
+                        return;
+                    }
+
+                    const previousIndex = navigationHistory.pop();
+                    navigateToIndex(previousIndex, false);
+                }
+
+                function toggleCurrentVideo() {
+                    if (!currentItem) {
+                        return;
+                    }
+
+                    const { video } = getMediaElements(currentItem);
                     if (!video) {
                         return;
                     }
@@ -337,180 +551,15 @@
                     }
                 }
 
-                // Basic Navigation
-                function navigateToNext() {
-                    if (items.length === 0) {
-                        return;
-                    }
-
-                    const nextIndex = (currentIndex + 1) % items.length;
-                    navigateToIndex(nextIndex);
-                }
-
-                function navigateToPrevious() {
-                    if (items.length === 0) {
-                        return;
-                    }
-
-                    const prevIndex =
-                        (currentIndex - 1 + items.length) % items.length;
-                    navigateToIndex(prevIndex);
-                }
-
-                // Path Navigation
-                function getItemPath(item) {
-                    const filename = item.getAttribute("data-filename");
-                    if (!filename) return "";
-
-                    const lastSlash = filename.lastIndexOf("/");
-                    const lastBackslash = filename.lastIndexOf("\\");
-                    const separatorIndex = Math.max(lastSlash, lastBackslash);
-
-                    return separatorIndex > -1
-                        ? filename.substring(0, separatorIndex)
-                        : "";
-                }
-
-                function navigateToNextPath() {
-                    if (items.length === 0) {
-                        return;
-                    }
-
-                    const currentPath = getItemPath(current);
-
-                    for (let i = currentIndex + 1; i < items.length; i++) {
-                        const itemPath = getItemPath(items[i]);
-                        if (itemPath !== currentPath) {
-                            navigateToIndex(i);
-                            return;
-                        }
-                    }
-
-                    for (let i = 0; i < currentIndex; i++) {
-                        const itemPath = getItemPath(items[i]);
-                        if (itemPath !== currentPath) {
-                            navigateToIndex(i);
-                            return;
-                        }
-                    }
-                }
-
-                function navigateToPreviousPath() {
-                    if (items.length === 0) {
-                        return;
-                    }
-
-                    const currentPath = getItemPath(current);
-
-                    for (let i = currentIndex - 1; i >= 0; i--) {
-                        const itemPath = getItemPath(items[i]);
-                        if (itemPath !== currentPath) {
-                            let firstOfPath = i;
-                            for (let j = i - 1; j >= 0; j--) {
-                                if (getItemPath(items[j]) === itemPath) {
-                                    firstOfPath = j;
-                                } else {
-                                    break;
-                                }
-                            }
-                            navigateToIndex(firstOfPath);
-                            return;
-                        }
-                    }
-
-                    for (let i = items.length - 1; i > currentIndex; i--) {
-                        const itemPath = getItemPath(items[i]);
-                        if (itemPath !== currentPath) {
-                            let firstOfPath = i;
-                            for (let j = i - 1; j > currentIndex; j--) {
-                                if (getItemPath(items[j]) === itemPath) {
-                                    firstOfPath = j;
-                                } else {
-                                    break;
-                                }
-                            }
-                            navigateToIndex(firstOfPath);
-                            return;
-                        }
-                    }
-                }
-
-                function navigateToFirstInPath() {
-                    if (items.length === 0) {
-                        return;
-                    }
-
-                    const currentPath = getItemPath(current);
-
-                    for (let i = 0; i < items.length; i++) {
-                        const itemPath = getItemPath(items[i]);
-                        if (itemPath === currentPath) {
-                            navigateToIndex(i);
-                            return;
-                        }
-                    }
-                }
-
-                function navigateToLastInPath() {
-                    if (items.length === 0) {
-                        return;
-                    }
-
-                    const currentPath = getItemPath(current);
-
-                    for (let i = items.length - 1; i >= 0; i--) {
-                        const itemPath = getItemPath(items[i]);
-                        if (itemPath === currentPath) {
-                            navigateToIndex(i);
-                            return;
-                        }
-                    }
-                }
-
-                // Random Navigation
-                function navigateToRandom() {
-                    if (items.length === 0) {
-                        return;
-                    }
-
-                    if (remainingItems.length === 0) {
-                        remainingItems = [...Array(items.length).keys()];
-                        viewedItems.clear();
-                    }
-
-                    viewedItems.add(currentIndex);
-
-                    const currentInRemaining =
-                        remainingItems.indexOf(currentIndex);
-                    if (currentInRemaining !== -1) {
-                        remainingItems.splice(currentInRemaining, 1);
-                    }
-
-                    if (remainingItems.length > 0) {
-                        const randomIndex = Math.floor(
-                            Math.random() * remainingItems.length
-                        );
-                        const targetIndex = remainingItems[randomIndex];
-                        navigateToIndex(targetIndex);
-                    }
-                }
-
-                function navigateBackward() {
-                    if (history.length === 0) {
-                        return;
-                    }
-
-                    const previousIndex = history.pop();
-                    navigateToIndex(previousIndex, false);
-                }
-
+                // -----------------------------------------------------------------
                 // Deletion
+                // -----------------------------------------------------------------
                 async function deleteCurrent() {
-                    if (!current) {
+                    if (!currentItem) {
                         return;
                     }
 
-                    const filename = current.getAttribute("data-filename");
+                    const filename = currentItem.getAttribute("data-filename");
                     if (!filename) {
                         return;
                     }
@@ -518,11 +567,10 @@
                     try {
                         const response = await fetch(
                             "/api/delete?name=" + encodeURIComponent(filename),
-                            { method: "DELETE" }
+                            { method: "DELETE" },
                         );
 
                         const data = await response.json().catch(() => ({}));
-
                         if (!response.ok || !data.ok) {
                             const errorMessage = data.error
                                 ? ": " + data.error
@@ -531,7 +579,7 @@
                             return;
                         }
 
-                        const video = current.querySelector("video");
+                        const { video } = getMediaElements(currentItem);
                         if (video) {
                             try {
                                 video.pause();
@@ -539,125 +587,111 @@
                             } catch (e) {}
                         }
 
-                        observer.unobserve(current);
-                        current.remove();
+                        const removedItem = currentItem;
+                        observer.unobserve(removedItem);
 
-                        const removedIndex = items.indexOf(current);
+                        const removedIndex = items.indexOf(removedItem);
+                        removedItem.remove();
+
                         if (removedIndex !== -1) {
                             items.splice(removedIndex, 1);
 
-                            remainingItems = remainingItems
+                            randomPool = randomPool
                                 .map((idx) =>
-                                    idx > removedIndex ? idx - 1 : idx
+                                    idx > removedIndex ? idx - 1 : idx,
                                 )
                                 .filter((idx) => idx !== removedIndex);
 
-                            const newViewedItems = new Set();
-                            viewedItems.forEach((idx) => {
-                                if (idx !== removedIndex) {
-                                    const adjustedIndex =
-                                        idx > removedIndex ? idx - 1 : idx;
-                                    newViewedItems.add(adjustedIndex);
-                                }
-                            });
-                            viewedItems = newViewedItems;
-
-                            history = history
+                            navigationHistory = navigationHistory
                                 .map((idx) =>
-                                    idx > removedIndex ? idx - 1 : idx
+                                    idx > removedIndex ? idx - 1 : idx,
                                 )
                                 .filter((idx) => idx !== removedIndex);
                         }
 
-                        if (items.length > 0) {
-                            const target = findClosestToCenter() || items[0];
-                            target.scrollIntoView({
-                                behavior: "auto",
-                                block: "start",
-                            });
-
-                            current = target;
-                            currentIndex = items.indexOf(target);
-                            if (currentIndex === -1) {
-                                currentIndex = 0;
-                                current = items[0];
-                            }
-
+                        if (items.length === 0) {
                             resetMediaWindow();
-                            updateMediaWindow(currentIndex);
-                        } else {
-                            resetMediaWindow();
+                            currentItem = null;
+                            currentIndex = 0;
                             document.body.innerHTML =
                                 '<p style="padding:2rem;color:#aaa">No media files remain.</p>';
+                            return;
                         }
+
+                        const targetItem = findClosestToCenter() || items[0];
+                        targetItem.scrollIntoView({
+                            behavior: "auto",
+                            block: "start",
+                        });
+
+                        const targetIndex = items.indexOf(targetItem);
+                        setCurrentByIndex(targetIndex === -1 ? 0 : targetIndex);
+
+                        resetMediaWindow();
+                        updateMediaWindow(currentIndex);
                     } catch (error) {
                         alert("Delete failed: " + error);
                     }
                 }
 
-                // Keyboard Controls
-                document.addEventListener("keydown", (e) => {
-                    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) {
+                // -----------------------------------------------------------------
+                // Keyboard controls
+                // -----------------------------------------------------------------
+                document.addEventListener("keydown", (event) => {
+                    if (
+                        event.ctrlKey ||
+                        event.altKey ||
+                        event.metaKey ||
+                        event.shiftKey
+                    ) {
                         return;
                     }
 
-                    const key = e.key.toLowerCase();
+                    const key = event.key.toLowerCase();
 
                     switch (key) {
                         case "x":
-                            e.preventDefault();
+                            event.preventDefault();
                             deleteCurrent();
                             break;
                         case "j":
-                            e.preventDefault();
+                            event.preventDefault();
                             navigateToNext();
                             break;
                         case "k":
-                            e.preventDefault();
+                            event.preventDefault();
                             navigateToPrevious();
                             break;
                         case "n":
-                            e.preventDefault();
+                            event.preventDefault();
                             navigateToRandom();
                             break;
                         case "b":
-                            e.preventDefault();
+                            event.preventDefault();
                             navigateBackward();
                             break;
                         case " ":
-                            e.preventDefault();
+                            event.preventDefault();
                             toggleCurrentVideo();
                             break;
                         case "h":
-                            e.preventDefault();
+                        case "pagedown":
+                            event.preventDefault();
                             navigateToNextPath();
                             break;
                         case "l":
-                            e.preventDefault();
+                        case "pageup":
+                            event.preventDefault();
                             navigateToPreviousPath();
                             break;
                         case "u":
-                            e.preventDefault();
+                        case "home":
+                            event.preventDefault();
                             navigateToFirstInPath();
                             break;
                         case "i":
-                            e.preventDefault();
-                            navigateToLastInPath();
-                            break;
-                        case "pagedown":
-                            e.preventDefault();
-                            navigateToNextPath();
-                            break;
-                        case "pageup":
-                            e.preventDefault();
-                            navigateToPreviousPath();
-                            break;
-                        case "home":
-                            e.preventDefault();
-                            navigateToFirstInPath();
-                            break;
                         case "end":
-                            e.preventDefault();
+                            event.preventDefault();
                             navigateToLastInPath();
                             break;
                     }
