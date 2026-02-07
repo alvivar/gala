@@ -90,6 +90,7 @@
                 let currentIndex = 0;
                 let navigationHistory = [];
                 let randomPool = createIndexPool(items.length);
+                let unmutedMode = false;
 
                 // Media window state
                 let keptStart = -1;
@@ -175,7 +176,8 @@
                         return;
                     }
 
-                    video.muted = true;
+                    const isCurrentItem = video.closest(".item") === currentItem;
+                    applyVideoMuteState(video, isCurrentItem);
 
                     if (video.classList.contains("loaded")) {
                         video.play().catch(() => {});
@@ -185,7 +187,12 @@
                     if (video.dataset.src) {
                         loadVideo(video)
                             .then(() => {
-                                video.play().catch(() => {});
+                                const stillCurrent =
+                                    video.closest(".item") === currentItem;
+                                applyVideoMuteState(video, stillCurrent);
+                                if (stillCurrent) {
+                                    video.play().catch(() => {});
+                                }
                             })
                             .catch(() => {});
                     }
@@ -325,6 +332,26 @@
                     currentItem = items[index];
                 }
 
+                function applyVideoMuteState(video, isCurrentItem) {
+                    if (!video) {
+                        return;
+                    }
+
+                    video.muted = !(unmutedMode && isCurrentItem);
+                }
+
+                function applyMuteModeToAllVideos() {
+                    items.forEach((item) => {
+                        const { video } = getMediaElements(item);
+                        applyVideoMuteState(video, item === currentItem);
+                    });
+                }
+
+                function toggleUnmutedMode() {
+                    unmutedMode = !unmutedMode;
+                    applyMuteModeToAllVideos();
+                }
+
                 function getItemPath(item) {
                     if (!item) {
                         return "";
@@ -362,8 +389,15 @@
                             const newIndex = items.indexOf(entry.target);
                             if (newIndex !== -1) {
                                 if (newIndex !== currentIndex) {
+                                    const previousItem = currentItem;
                                     setCurrentByIndex(newIndex);
                                     updateMediaWindow(currentIndex);
+
+                                    if (previousItem) {
+                                        const { video: previousVideo } =
+                                            getMediaElements(previousItem);
+                                        applyVideoMuteState(previousVideo, false);
+                                    }
                                 } else {
                                     currentItem = entry.target;
                                 }
@@ -373,13 +407,11 @@
                             return;
                         }
 
-                        if (
-                            video &&
-                            video.classList.contains("loaded") &&
-                            !video.paused
-                        ) {
-                            video.pause();
-                            video.muted = true;
+                        if (video) {
+                            if (video.classList.contains("loaded") && !video.paused) {
+                                video.pause();
+                            }
+                            applyVideoMuteState(video, false);
                         }
                     });
                 }
@@ -557,6 +589,7 @@
                     ) {
                         loadVideo(video)
                             .then(() => {
+                                applyVideoMuteState(video, true);
                                 video.play().catch(() => {});
                             })
                             .catch(() => {});
@@ -564,6 +597,7 @@
                     }
 
                     if (video.paused) {
+                        applyVideoMuteState(video, true);
                         video.play().catch(() => {});
                     } else {
                         video.pause();
@@ -692,6 +726,10 @@
                         case " ":
                             event.preventDefault();
                             toggleCurrentVideo();
+                            break;
+                        case "m":
+                            event.preventDefault();
+                            toggleUnmutedMode();
                             break;
                         case "h":
                         case "pagedown":

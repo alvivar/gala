@@ -9,6 +9,7 @@ A simple, dependency-free Python server that creates a fullscreen web gallery fo
 - **Lazy loading + unloading** for better memory/performance on large galleries
 - **Autoplay video in view** and pause when out of view
 - **Keyboard-first navigation** (next/prev, random, back, path navigation)
+- **Audio mode toggle** with `m` (unmuted mode keeps only the current/visible video audible)
 - **Safe delete flow**: moving files into a local `deleted/` folder (not immediate permanent removal)
 
 ## Requirements
@@ -85,11 +86,14 @@ You can customize these via:
 ### Playback and delete
 
 - `Space` → play/pause current video
+- `m` → toggle audio mode for the current video (unmuted/muted)
 - `x` → move current file to `deleted/`
 
 Notes:
 
 - Clicking an image opens it in a new tab.
+- In unmuted mode, only the current/visible video has sound; other videos remain muted.
+- Browsers may still block unmuted autoplay depending on autoplay policy.
 - Files moved to `deleted/` are excluded from gallery listing.
 
 ---
