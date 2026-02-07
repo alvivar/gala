@@ -16,22 +16,33 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}
 VIDEO_EXTENSIONS = {".webm", ".mp4"}
 ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 DELETED_DIR_NAME = "deleted"
+HISTORY_FILE = Path("history.txt")
+HTML_TEMPLATE_FILE = "gala.html"
+NO_MEDIA_HTML = '<p style="padding:2rem;color:#aaa">No media files found.</p>'
+
+
+def is_supported_media_file(path: Path) -> bool:
+    return path.is_file() and path.suffix.lower() in ALLOWED_EXTENSIONS
+
+
+def is_in_deleted_folder(relative_path: Path) -> bool:
+    return bool(relative_path.parts) and relative_path.parts[0] == DELETED_DIR_NAME
 
 
 def list_media_files(base_dir: Path) -> list[str]:
     try:
-        files: list[str] = []
+        media_files: list[str] = []
         for entry in base_dir.rglob("*"):
-            if not entry.is_file() or entry.suffix.lower() not in ALLOWED_EXTENSIONS:
+            if not is_supported_media_file(entry):
                 continue
 
             relative_path = entry.relative_to(base_dir)
-            if relative_path.parts and relative_path.parts[0] == DELETED_DIR_NAME:
+            if is_in_deleted_folder(relative_path):
                 continue
 
-            files.append(relative_path.as_posix())
+            media_files.append(relative_path.as_posix())
 
-        return sorted(files)
+        return sorted(media_files)
     except FileNotFoundError:
         return []
 
@@ -53,11 +64,14 @@ def create_media_item_html(filename: str) -> str:
             f"</a>"
         )
 
-    return f'<div class="item" data-name="{safe_name}" data-filename="{quoted_src}">{media_tag}</div>'
+    return (
+        f'<div class="item" data-name="{safe_name}" '
+        f'data-filename="{quoted_src}">{media_tag}</div>'
+    )
 
 
 def load_html_template() -> str:
-    template_path = Path(__file__).parent / "gala.html"
+    template_path = Path(__file__).parent / HTML_TEMPLATE_FILE
     return template_path.read_text(encoding="utf-8")
 
 
@@ -65,31 +79,30 @@ def generate_gallery_html(files: list[str]) -> bytes:
     items_html = (
         "\n".join(create_media_item_html(filename) for filename in files)
         if files
-        else '<p style="padding:2rem;color:#aaa">No media files found.</p>'
+        else NO_MEDIA_HTML
     )
 
-    html_template = load_html_template()
-    html_document = html_template.replace("{items_html}", items_html)
+    html_document = load_html_template().replace("{items_html}", items_html)
     return html_document.encode("utf-8")
 
 
-def save_path_to_history(path: str) -> None:
-    history_file = Path("history.txt")
+def save_path_to_history(path: str, history_file: Path = HISTORY_FILE) -> None:
+    existing_paths: list[str] = []
 
-    existing_paths = []
     if history_file.exists():
         try:
             existing_paths = [
-                p
-                for p in history_file.read_text(encoding="utf-8").splitlines()
-                if p.strip()
+                value
+                for value in history_file.read_text(encoding="utf-8").splitlines()
+                if value.strip()
             ]
         except OSError:
             pass
 
     if path in existing_paths:
         existing_paths.remove(path)
-    updated_paths = [path] + existing_paths
+
+    updated_paths = [path, *existing_paths]
 
     try:
         history_file.write_text("\n".join(updated_paths) + "\n", encoding="utf-8")
@@ -103,11 +116,12 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(self.base_dir), **kwargs)
 
     def do_GET(self) -> None:
-        parsed_url = urllib.parse.urlparse(self.path)
-        if parsed_url.path == "/":
+        request_path = urllib.parse.urlparse(self.path).path
+        if request_path == "/":
             self._serve_gallery()
-        else:
-            super().do_GET()
+            return
+
+        super().do_GET()
 
     def do_DELETE(self) -> None:
         parsed_url = urllib.parse.urlparse(self.path)
@@ -129,23 +143,11 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {"ok": False, "error": "Missing filename"})
             return
 
-        file_path = (self.base_dir / urllib.parse.unquote(filename)).resolve()
-
         try:
-            relative_path = file_path.relative_to(self.base_dir)
+            source_file, relative_path = self._resolve_source_file(filename)
+            destination = self._build_delete_destination(source_file, relative_path)
 
-            deleted_dir = self.base_dir / DELETED_DIR_NAME
-            destination = deleted_dir / relative_path
-            destination.parent.mkdir(parents=True, exist_ok=True)
-
-            if destination.exists():
-                stem, suffix = file_path.stem, file_path.suffix
-                for i in count(1):
-                    destination = destination.parent / f"{stem}_{i}{suffix}"
-                    if not destination.exists():
-                        break
-
-            shutil.move(file_path, destination)
+            shutil.move(source_file, destination)
             self._send_json(200, {"ok": True})
         except ValueError:
             self._send_json(403, {"ok": False, "error": "Invalid file path"})
@@ -155,6 +157,27 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             self._send_json(403, {"ok": False, "error": "Permission denied"})
         except Exception as error:
             self._send_json(500, {"ok": False, "error": str(error)})
+
+    def _resolve_source_file(self, filename: str) -> tuple[Path, Path]:
+        source_file = (self.base_dir / urllib.parse.unquote(filename)).resolve()
+        relative_path = source_file.relative_to(self.base_dir)
+        return source_file, relative_path
+
+    def _build_delete_destination(self, source_file: Path, relative_path: Path) -> Path:
+        deleted_dir = self.base_dir / DELETED_DIR_NAME
+        destination = deleted_dir / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+
+        if not destination.exists():
+            return destination
+
+        stem, suffix = source_file.stem, source_file.suffix
+        for index in count(1):
+            candidate = destination.parent / f"{stem}_{index}{suffix}"
+            if not candidate.exists():
+                return candidate
+
+        raise RuntimeError("Could not determine destination filename")
 
     def _send_response(self, status: int, content_type: str, content: bytes) -> None:
         self.send_response(status)
@@ -168,7 +191,7 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         self._send_response(status, "application/json; charset=utf-8", content)
 
 
-def main() -> None:
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Simple web gallery server for images and videos"
     )
@@ -187,7 +210,11 @@ def main() -> None:
     parser.add_argument(
         "--no-open", action="store_true", help="do not open browser on start"
     )
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
 
     base_directory = Path(args.directory).resolve()
     if not base_directory.exists():
