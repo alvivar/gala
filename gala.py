@@ -15,15 +15,22 @@ from pathlib import Path
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif"}
 VIDEO_EXTENSIONS = {".webm", ".mp4"}
 ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
+DELETED_DIR_NAME = "deleted"
 
 
 def list_media_files(base_dir: Path) -> list[str]:
     try:
-        files = [
-            entry.relative_to(base_dir).as_posix()
-            for entry in base_dir.rglob("*")
-            if entry.is_file() and entry.suffix.lower() in ALLOWED_EXTENSIONS
-        ]
+        files: list[str] = []
+        for entry in base_dir.rglob("*"):
+            if not entry.is_file() or entry.suffix.lower() not in ALLOWED_EXTENSIONS:
+                continue
+
+            relative_path = entry.relative_to(base_dir)
+            if relative_path.parts and relative_path.parts[0] == DELETED_DIR_NAME:
+                continue
+
+            files.append(relative_path.as_posix())
+
         return sorted(files)
     except FileNotFoundError:
         return []
@@ -126,7 +133,7 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         try:
             relative_path = file_path.relative_to(self.base_dir)
 
-            deleted_dir = self.base_dir / "deleted"
+            deleted_dir = self.base_dir / DELETED_DIR_NAME
             destination = deleted_dir / relative_path
             destination.parent.mkdir(parents=True, exist_ok=True)
 
@@ -139,6 +146,8 @@ class GalleryHandler(SimpleHTTPRequestHandler):
 
             shutil.move(file_path, destination)
             self._send_json(200, {"ok": True})
+        except ValueError:
+            self._send_json(403, {"ok": False, "error": "Invalid file path"})
         except FileNotFoundError:
             self._send_json(404, {"ok": False, "error": "File not found"})
         except PermissionError:
