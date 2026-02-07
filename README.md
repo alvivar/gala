@@ -138,7 +138,7 @@ Error response shape:
 
 Common statuses:
 
-- `400` missing filename / invalid favorite target (e.g., non-media)
+- `400` missing filename / invalid media target (e.g., non-media)
 - `403` invalid path or permission denied
 - `404` file not found
 
@@ -157,7 +157,7 @@ If destination already exists, it is overwritten.
 
 ## Delete behavior
 
-Deletes are implemented as a move operation:
+Deletes are implemented as a move operation for supported media files (outside `deleted/` and `favorites/`):
 
 - Source: `<base_dir>/<relative_path>`
 - Destination: `<base_dir>/deleted/<relative_path>`
