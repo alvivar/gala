@@ -29,8 +29,7 @@ def is_supported_media_file(path: Path) -> bool:
 
 def is_in_excluded_media_folder(relative_path: Path) -> bool:
     return (
-        bool(relative_path.parts)
-        and relative_path.parts[0] in EXCLUDED_MEDIA_DIR_NAMES
+        bool(relative_path.parts) and relative_path.parts[0] in EXCLUDED_MEDIA_DIR_NAMES
     )
 
 
@@ -134,8 +133,7 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             self.send_error(404, "Not Found")
             return
 
-        query_params = urllib.parse.parse_qs(parsed_url.query)
-        filename = next(iter(query_params.get("name", [])), "")
+        filename = self._query_name_param(parsed_url)
         self._delete_file(filename)
 
     def do_POST(self) -> None:
@@ -144,9 +142,12 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             self.send_error(404, "Not Found")
             return
 
-        query_params = urllib.parse.parse_qs(parsed_url.query)
-        filename = next(iter(query_params.get("name", [])), "")
+        filename = self._query_name_param(parsed_url)
         self._favorite_file(filename)
+
+    def _query_name_param(self, parsed_url: urllib.parse.ParseResult) -> str:
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        return next(iter(query_params.get("name", [])), "")
 
     def _serve_gallery(self) -> None:
         files = list_media_files(self.base_dir)
@@ -154,65 +155,68 @@ class GalleryHandler(SimpleHTTPRequestHandler):
         self._send_response(200, "text/html; charset=utf-8", content)
 
     def _delete_file(self, filename: str) -> None:
-        if not filename:
-            self._send_json(400, {"ok": False, "error": "Missing filename"})
+        resolved = self._resolve_supported_media_file(
+            filename,
+            "Only supported media files can be deleted",
+        )
+        if not resolved:
             return
 
+        source_file, relative_path = resolved
         try:
-            source_file, relative_path = self._resolve_source_file(filename)
             destination = self._build_delete_destination(source_file, relative_path)
-
             shutil.move(source_file, destination)
             self._send_json(200, {"ok": True})
-        except ValueError:
-            self._send_json(403, {"ok": False, "error": "Invalid file path"})
-        except FileNotFoundError:
-            self._send_json(404, {"ok": False, "error": "File not found"})
         except PermissionError:
             self._send_json(403, {"ok": False, "error": "Permission denied"})
         except Exception as error:
             self._send_json(500, {"ok": False, "error": str(error)})
 
     def _favorite_file(self, filename: str) -> None:
-        if not filename:
-            self._send_json(400, {"ok": False, "error": "Missing filename"})
+        resolved = self._resolve_supported_media_file(
+            filename,
+            "Only supported media files can be favorited",
+        )
+        if not resolved:
             return
 
+        source_file, relative_path = resolved
         try:
-            source_file, relative_path = self._resolve_source_file(filename)
-
-            if is_in_excluded_media_folder(relative_path):
-                self._send_json(400, {"ok": False, "error": "Invalid file path"})
-                return
-
-            if not source_file.exists() or not source_file.is_file():
-                self._send_json(404, {"ok": False, "error": "File not found"})
-                return
-
-            if source_file.suffix.lower() not in ALLOWED_EXTENSIONS:
-                self._send_json(
-                    400,
-                    {
-                        "ok": False,
-                        "error": "Only supported media files can be favorited",
-                    },
-                )
-                return
-
             destination = self._build_favorite_destination(relative_path)
             overwritten = destination.exists()
             shutil.copy2(source_file, destination)
             self._send_json(200, {"ok": True, "overwritten": overwritten})
-        except ValueError:
-            self._send_json(403, {"ok": False, "error": "Invalid file path"})
         except PermissionError:
             self._send_json(403, {"ok": False, "error": "Permission denied"})
         except Exception as error:
             self._send_json(500, {"ok": False, "error": str(error)})
 
-    def _resolve_source_file(self, filename: str) -> tuple[Path, Path]:
+    def _resolve_supported_media_file(
+        self, filename: str, unsupported_media_error: str
+    ) -> tuple[Path, Path] | None:
+        if not filename:
+            self._send_json(400, {"ok": False, "error": "Missing filename"})
+            return None
+
         source_file = (self.base_dir / urllib.parse.unquote(filename)).resolve()
-        relative_path = source_file.relative_to(self.base_dir)
+        try:
+            relative_path = source_file.relative_to(self.base_dir)
+        except ValueError:
+            self._send_json(403, {"ok": False, "error": "Invalid file path"})
+            return None
+
+        if is_in_excluded_media_folder(relative_path):
+            self._send_json(403, {"ok": False, "error": "Invalid file path"})
+            return None
+
+        if not source_file.exists() or not source_file.is_file():
+            self._send_json(404, {"ok": False, "error": "File not found"})
+            return None
+
+        if source_file.suffix.lower() not in ALLOWED_EXTENSIONS:
+            self._send_json(400, {"ok": False, "error": unsupported_media_error})
+            return None
+
         return source_file, relative_path
 
     def _build_delete_destination(self, source_file: Path, relative_path: Path) -> Path:
