@@ -20,6 +20,8 @@ FAVORITES_DIR_NAME = "favorites"
 EXCLUDED_MEDIA_DIR_NAMES = {DELETED_DIR_NAME, FAVORITES_DIR_NAME}
 HISTORY_FILE = Path("history.txt")
 HTML_TEMPLATE_FILE = "gala.html"
+TEMPLATE_PATH = Path(__file__).with_name(HTML_TEMPLATE_FILE)
+HTML_TEMPLATE = TEMPLATE_PATH.read_text(encoding="utf-8")
 NO_MEDIA_HTML = '<p style="padding:2rem;color:#aaa">No media files found.</p>'
 
 
@@ -74,11 +76,6 @@ def create_media_item_html(filename: str) -> str:
     )
 
 
-def load_html_template() -> str:
-    template_path = Path(__file__).parent / HTML_TEMPLATE_FILE
-    return template_path.read_text(encoding="utf-8")
-
-
 def generate_gallery_html(files: list[str]) -> bytes:
     items_html = (
         "\n".join(create_media_item_html(filename) for filename in files)
@@ -86,8 +83,7 @@ def generate_gallery_html(files: list[str]) -> bytes:
         else NO_MEDIA_HTML
     )
 
-    html_document = load_html_template().replace("{items_html}", items_html)
-    return html_document.encode("utf-8")
+    return HTML_TEMPLATE.replace("{items_html}", items_html).encode("utf-8")
 
 
 def save_path_to_history(path: str, history_file: Path = HISTORY_FILE) -> None:
