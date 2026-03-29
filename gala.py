@@ -25,10 +25,6 @@ HTML_TEMPLATE = TEMPLATE_PATH.read_text(encoding="utf-8")
 NO_MEDIA_HTML = '<p style="padding:2rem;color:#aaa">No media files found.</p>'
 
 
-def is_supported_media_file(path: Path) -> bool:
-    return path.is_file() and path.suffix.lower() in ALLOWED_EXTENSIONS
-
-
 def is_in_excluded_media_folder(relative_path: Path) -> bool:
     return (
         bool(relative_path.parts) and relative_path.parts[0] in EXCLUDED_MEDIA_DIR_NAMES
@@ -36,21 +32,24 @@ def is_in_excluded_media_folder(relative_path: Path) -> bool:
 
 
 def list_media_files(base_dir: Path) -> list[str]:
-    try:
-        media_files: list[str] = []
-        for entry in base_dir.rglob("*"):
-            if not is_supported_media_file(entry):
-                continue
-
-            relative_path = entry.relative_to(base_dir)
-            if is_in_excluded_media_folder(relative_path):
-                continue
-
-            media_files.append(relative_path.as_posix())
-
-        return sorted(media_files)
-    except FileNotFoundError:
+    if not base_dir.is_dir():
         return []
+
+    media_files: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(base_dir):
+        current_dir = Path(dirpath)
+        if current_dir == base_dir:
+            dirnames[:] = [
+                name for name in dirnames if name not in EXCLUDED_MEDIA_DIR_NAMES
+            ]
+        relative_dir = current_dir.relative_to(base_dir)
+        media_files.extend(
+            (relative_dir / name).as_posix()
+            for name in filenames
+            if Path(name).suffix.lower() in ALLOWED_EXTENSIONS
+        )
+
+    return sorted(media_files)
 
 
 def create_media_item_html(filename: str) -> str:
