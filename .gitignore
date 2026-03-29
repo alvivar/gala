@@ -1,3 +1,4 @@
-*CODE_REVIEW*
+.vscode/
+*CODE*REVIEW*
 /__pycache__
 history.txt
