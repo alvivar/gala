@@ -64,7 +64,7 @@ updated_paths = [path, *existing_paths]
 
 ## Should Fix
 
-### 8. Simplify `_query_name_param`
+### 8. ✅ Simplify `_query_name_param`
 
 ```python
 # current
@@ -77,14 +77,14 @@ return query_params.get("name", [""])[0]
 - **Category:** Simplicity
 - **Files:** `gala.py` — `_query_name_param()`
 
-### 9. Use `Path.cwd()` instead of `os.getcwd()`
+### 9. ✅ Use `Path.cwd()` instead of `os.getcwd()`
 
 `import os` is used solely for `os.getcwd()` in `GalleryHandler.__init__`. Replace with `Path.cwd()` and drop the `os` import.
 
 - **Category:** Idiomatic Python
 - **Files:** `gala.py` — `GalleryHandler.__init__()`, imports
 
-### 10. Extract shared helpers for path-bound navigation
+### 10. ✅ Extract shared helpers for path-bound navigation
 
 `navigateToFirstInPath` duplicates the backward-scan logic already in `findPathStart`. Reuse `findPathStart(currentIndex)` directly. For `navigateToLastInPath`, add a symmetric `findPathEnd` helper if needed.
 

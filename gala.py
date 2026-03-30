@@ -99,7 +99,7 @@ def save_path_to_history(path: str, history_file: Path = HISTORY_FILE) -> None:
 
 class GalleryHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory: str | None = None, **kwargs):
-        self.base_dir = Path(directory or os.getcwd()).resolve()
+        self.base_dir = Path(directory or Path.cwd()).resolve()
         super().__init__(*args, directory=str(self.base_dir), **kwargs)
 
     def do_GET(self) -> None:
@@ -130,7 +130,7 @@ class GalleryHandler(SimpleHTTPRequestHandler):
 
     def _query_name_param(self, parsed_url: urllib.parse.ParseResult) -> str:
         query_params = urllib.parse.parse_qs(parsed_url.query)
-        return next(iter(query_params.get("name", [])), "")
+        return query_params.get("name", [""])[0]
 
     def _serve_gallery(self) -> None:
         files = list_media_files(self.base_dir)

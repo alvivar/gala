@@ -467,6 +467,19 @@
           return start;
         }
 
+        function findPathEnd(index) {
+          if (!isValidIndex(index)) {
+            return -1;
+          }
+
+          const targetPath = pathAt(index);
+          let end = index;
+          while (end < items.length - 1 && pathAt(end + 1) === targetPath) {
+            end += 1;
+          }
+          return end;
+        }
+
         function navigateToPreviousPath() {
           if (items.length === 0) {
             return;
@@ -494,13 +507,7 @@
             return;
           }
 
-          const currentPath = pathAt(currentIndex);
-          for (let i = 0; i < items.length; i++) {
-            if (pathAt(i) === currentPath) {
-              navigateToIndex(i);
-              return;
-            }
-          }
+          navigateToIndex(findPathStart(currentIndex));
         }
 
         function navigateToLastInPath() {
@@ -508,13 +515,7 @@
             return;
           }
 
-          const currentPath = pathAt(currentIndex);
-          for (let i = items.length - 1; i >= 0; i--) {
-            if (pathAt(i) === currentPath) {
-              navigateToIndex(i);
-              return;
-            }
-          }
+          navigateToIndex(findPathEnd(currentIndex));
         }
 
         function navigateToRandom() {
