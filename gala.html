@@ -123,21 +123,21 @@
           return new Promise((resolve, reject) => {
             img.classList.add("loading");
 
-            const tempImg = new Image();
-            tempImg.onload = () => {
-              img.src = img.dataset.src;
+            img.onload = () => {
               img.classList.remove("loading");
               img.classList.add("loaded");
+              img.onload = img.onerror = null;
               resolve();
             };
 
-            tempImg.onerror = () => {
+            img.onerror = () => {
               img.classList.remove("loading");
               img.classList.add("error");
+              img.onload = img.onerror = null;
               reject(new Error("Failed to load image"));
             };
 
-            tempImg.src = img.dataset.src;
+            img.src = img.dataset.src;
           });
         }
 
@@ -235,6 +235,7 @@
           const { image, video } = itemMeta[index];
 
           if (image && image.src && image.dataset.src) {
+            image.onload = image.onerror = null;
             image.src = "";
             image.classList.remove("loaded", "loading");
           }

@@ -102,21 +102,21 @@ Python emits a URL-encoded filename, JS re-encodes it for API calls, and the ser
 - **Category:** Simplicity
 - **Files:** `gala.py` — `create_media_item_html()`, `gala.html` — `getItemPath()`, API calls
 
-### 12. Narrow broad `except Exception` / silent `pass`
+### 12. ✅ Narrow broad `except Exception` / silent `pass`
 
 Several places use `except Exception` or bare `except ... pass` blocks (e.g., `_delete_file`, `_favorite_file`, `webbrowser.open`). Acceptable for a small utility, but could mask unexpected errors.
 
 - **Category:** Idiomatic Python
 - **Files:** `gala.py` — `_delete_file()`, `_favorite_file()`, `main()`
 
-### 13. Revisit `self.base_dir` vs `self.directory`
+### 13. ➖ Revisit `self.base_dir` vs `self.directory` (skipped — no change needed)
 
 `GalleryHandler.__init__` stores `self.base_dir` as a `Path`, but `super().__init__()` already stores the same value as a string in `self.directory`. Maintaining both is slightly redundant. Keeping a `Path` on the handler is reasonable for ergonomics, but worth being aware of.
 
 - **Category:** Simplicity
 - **Files:** `gala.py` — `GalleryHandler.__init__()`
 
-### 14. Reevaluate temp `Image()` preloading approach
+### 14. ✅ Reevaluate temp `Image()` preloading approach
 
 `loadImage` creates a throwaway `new Image()` to preload, then sets `img.src` on success. This avoids showing a broken/half-loaded state on the real element, but creates an extra object and decode pass. Setting `onload`/`onerror` directly on the real `<img>` element is simpler and avoids the overhead. Lower priority unless profiling shows it matters.
 
