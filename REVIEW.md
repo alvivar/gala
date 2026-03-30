@@ -6,35 +6,35 @@ Review focused on **simplicity**, **performance**, and **idiomatic Python** (pri
 
 ## Must Fix
 
-### 1. Cache HTML template
+### 1. ✅ Cache HTML template
 
 `load_html_template()` reads `gala.html` from disk on every `GET /`. Cache it once at startup or on first use.
 
 - **Category:** Performance
 - **Files:** `gala.py` — `load_html_template()`, `generate_gallery_html()`
 
-### 2. Prune excluded dirs during traversal
+### 2. ✅ Prune excluded dirs during traversal
 
 `list_media_files` uses `rglob("*")` and post-filters excluded directories (`deleted/`, `favorites/`). Switch to `os.walk()` with directory pruning so we never descend into those trees at all.
 
 - **Category:** Performance + Simplicity
 - **Files:** `gala.py` — `list_media_files()`
 
-### 3. Replace `items.indexOf()` in observer with O(1) lookup
+### 3. ✅ Replace `items.indexOf()` in observer with O(1) lookup
 
 The `IntersectionObserver` callback calls `items.indexOf(entry.target)` on every visibility change — an O(n) scan per event. Use a `WeakMap` for constant-time index lookup. Update it when items are spliced in `deleteCurrent`.
 
 - **Category:** Performance
 - **Files:** `gala.html` — `handleIntersections()`, `deleteCurrent()`
 
-### 4. Cache item metadata once in JS
+### 4. ✅ Cache item metadata once in JS
 
 `getMediaElements(item)` re-queries the DOM via `querySelector` on every call. `pathAt(i)` recomputes the path by parsing the filename string each time, including inside tight loops in `navigateToNextPath`/`navigateToPreviousPath`/`findPathStart`. Cache per-item metadata (media element refs, precomputed paths) once at startup and maintain it on deletion.
 
 - **Category:** Performance
 - **Files:** `gala.html` — `getMediaElements()`, `pathAt()`, navigation functions
 
-### 5. Simplify `save_path_to_history`
+### 5. ✅ Simplify `save_path_to_history`
 
 Current logic uses `if path in existing_paths` then `existing_paths.remove(path)` — two linear scans, and it only removes one duplicate. Replace with a single filter pass that removes all occurrences:
 
@@ -46,14 +46,14 @@ updated_paths = [path, *existing_paths]
 - **Category:** Simplicity + Idiomatic Python
 - **Files:** `gala.py` — `save_path_to_history()`
 
-### 6. Remove dead code
+### 6. ✅ Remove dead code
 
 - **Unreachable `raise RuntimeError`** in `_build_delete_destination`: the `for index in count(1):` loop is infinite, so the `raise` after it never executes. Rewrite with a simple `while` loop and drop the `itertools.count` import.
 - **Unused `data-name` attribute**: `create_media_item_html` emits `data-name="{safe_name}"` but nothing in the HTML/JS reads it. Remove it and drop `import html` if no longer needed.
 - **Category:** Simplicity
 - **Files:** `gala.py` — `_build_delete_destination()`, `create_media_item_html()`
 
-### 7. Validate `is_dir()` in `main()`, not just `exists()`
+### 7. ✅ Validate `is_dir()` in `main()`, not just `exists()`
 
 `main()` checks `if not base_directory.exists()` but should check `is_dir()` — passing a file path would produce confusing behavior rather than a clear error.
 
