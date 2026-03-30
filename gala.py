@@ -1,5 +1,4 @@
 import argparse
-import html
 import json
 import os
 import shutil
@@ -8,7 +7,6 @@ import urllib.parse
 import webbrowser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from itertools import count
 from pathlib import Path
 
 
@@ -53,7 +51,6 @@ def list_media_files(base_dir: Path) -> list[str]:
 
 
 def create_media_item_html(filename: str) -> str:
-    safe_name = html.escape(filename, quote=True)
     quoted_src = urllib.parse.quote(filename, safe="/")
     extension = Path(filename).suffix.lower()
 
@@ -69,10 +66,7 @@ def create_media_item_html(filename: str) -> str:
             f"</a>"
         )
 
-    return (
-        f'<div class="item" data-name="{safe_name}" '
-        f'data-filename="{quoted_src}">{media_tag}</div>'
-    )
+    return f'<div class="item" data-filename="{quoted_src}">{media_tag}</div>'
 
 
 def generate_gallery_html(files: list[str]) -> bytes:
@@ -217,12 +211,12 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             return destination
 
         stem, suffix = source_file.stem, source_file.suffix
-        for index in count(1):
-            candidate = destination.parent / f"{stem}_{index}{suffix}"
+        n = 1
+        while True:
+            candidate = destination.parent / f"{stem}_{n}{suffix}"
             if not candidate.exists():
                 return candidate
-
-        raise RuntimeError("Could not determine destination filename")
+            n += 1
 
     def _build_favorite_destination(self, relative_path: Path) -> Path:
         favorites_dir = self.base_dir / FAVORITES_DIR_NAME
