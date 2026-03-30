@@ -95,7 +95,7 @@ return query_params.get("name", [""])[0]
 
 ## Nice to Have
 
-### 11. Simplify path encoding/decoding flow
+### 11. ✅ Simplify path encoding/decoding flow
 
 Python emits a URL-encoded filename, JS re-encodes it for API calls, and the server decodes it again. JS also re-parses the encoded filename for directory grouping. Consider separating the raw relative path (for actions/grouping) from the encoded URL (for `src`/`href`). Works correctly as-is, but adds unnecessary complexity.
 
