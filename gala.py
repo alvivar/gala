@@ -86,22 +86,16 @@ def generate_gallery_html(files: list[str]) -> bytes:
 
 
 def save_path_to_history(path: str, history_file: Path = HISTORY_FILE) -> None:
-    existing_paths: list[str] = []
+    try:
+        existing_paths = [
+            value
+            for value in history_file.read_text(encoding="utf-8").splitlines()
+            if value.strip()
+        ]
+    except OSError:
+        existing_paths = []
 
-    if history_file.exists():
-        try:
-            existing_paths = [
-                value
-                for value in history_file.read_text(encoding="utf-8").splitlines()
-                if value.strip()
-            ]
-        except OSError:
-            pass
-
-    if path in existing_paths:
-        existing_paths.remove(path)
-
-    updated_paths = [path, *existing_paths]
+    updated_paths = [path] + [p for p in existing_paths if p != path]
 
     try:
         history_file.write_text("\n".join(updated_paths) + "\n", encoding="utf-8")
