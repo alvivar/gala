@@ -610,7 +610,8 @@
           }
 
           await sendMediaActionRequest(
-            "/api/favorite?name=" + encodeURIComponent(filename),
+            // data-filename is already URL-encoded by the server
+            "/api/favorite?name=" + filename,
             "POST",
             "Favorite",
           );
@@ -623,7 +624,8 @@
           }
 
           const result = await sendMediaActionRequest(
-            "/api/delete?name=" + encodeURIComponent(filename),
+            // data-filename is already URL-encoded by the server
+            "/api/delete?name=" + filename,
             "DELETE",
             "Delete",
           );

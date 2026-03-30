@@ -181,7 +181,7 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {"ok": False, "error": "Missing filename"})
             return None
 
-        source_file = (self.base_dir / urllib.parse.unquote(filename)).resolve()
+        source_file = (self.base_dir / filename).resolve()
         try:
             relative_path = source_file.relative_to(self.base_dir)
         except ValueError:
