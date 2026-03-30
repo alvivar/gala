@@ -262,7 +262,7 @@ def main() -> None:
     args = parse_args()
 
     base_directory = Path(args.directory).resolve()
-    if not base_directory.exists():
+    if not base_directory.is_dir():
         print(f"Directory not found: {base_directory}", file=sys.stderr)
         sys.exit(1)
 
