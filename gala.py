@@ -152,7 +152,7 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"ok": True})
         except PermissionError:
             self._send_json(403, {"ok": False, "error": "Permission denied"})
-        except Exception as error:
+        except OSError as error:
             self._send_json(500, {"ok": False, "error": str(error)})
 
     def _favorite_file(self, filename: str) -> None:
@@ -171,7 +171,7 @@ class GalleryHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"ok": True, "overwritten": overwritten})
         except PermissionError:
             self._send_json(403, {"ok": False, "error": "Permission denied"})
-        except Exception as error:
+        except OSError as error:
             self._send_json(500, {"ok": False, "error": str(error)})
 
     def _resolve_supported_media_file(
