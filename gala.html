@@ -86,6 +86,7 @@
 
         // State
         let items = Array.from(document.querySelectorAll(".item"));
+        let itemMeta = items.map(buildItemMeta);
         let itemIndexMap = new WeakMap();
         let currentItem = items[0] || null;
         let currentIndex = 0;
@@ -173,13 +174,12 @@
           });
         }
 
-        function autoplayVisibleVideo(video) {
+        function autoplayVisibleVideo(video, index) {
           if (!video) {
             return;
           }
 
-          const isCurrentItem = video.closest(".item") === currentItem;
-          applyVideoMuteState(video, isCurrentItem);
+          applyVideoMuteState(video, index === currentIndex);
 
           if (video.classList.contains("loaded")) {
             video.play().catch(() => {});
@@ -189,9 +189,8 @@
           if (video.dataset.src) {
             loadVideo(video)
               .then(() => {
-                const stillCurrent = video.closest(".item") === currentItem;
-                applyVideoMuteState(video, stillCurrent);
-                if (stillCurrent) {
+                applyVideoMuteState(video, index === currentIndex);
+                if (index === currentIndex) {
                   video.play().catch(() => {});
                 }
               })
@@ -199,10 +198,16 @@
           }
         }
 
-        function getMediaElements(item) {
+        function buildItemMeta(item) {
+          const filename = item.getAttribute("data-filename") || "";
+          const sep = Math.max(
+            filename.lastIndexOf("/"),
+            filename.lastIndexOf("\\"),
+          );
           return {
             image: item.querySelector(".lazy-image"),
             video: item.querySelector(".lazy-video"),
+            path: sep > -1 ? filename.substring(0, sep) : "",
           };
         }
 
@@ -211,7 +216,7 @@
             return;
           }
 
-          const { image, video } = getMediaElements(items[index]);
+          const { image, video } = itemMeta[index];
 
           if (image && !image.classList.contains("loaded")) {
             loadImage(image).catch(() => {});
@@ -227,7 +232,7 @@
             return;
           }
 
-          const { image, video } = getMediaElements(items[index]);
+          const { image, video } = itemMeta[index];
 
           if (image && image.src && image.dataset.src) {
             image.src = "";
@@ -337,9 +342,8 @@
         }
 
         function applyMuteModeToAllVideos() {
-          items.forEach((item) => {
-            const { video } = getMediaElements(item);
-            applyVideoMuteState(video, item === currentItem);
+          itemMeta.forEach((meta, index) => {
+            applyVideoMuteState(meta.video, index === currentIndex);
           });
         }
 
@@ -348,27 +352,8 @@
           applyMuteModeToAllVideos();
         }
 
-        function getItemPath(item) {
-          if (!item) {
-            return "";
-          }
-
-          const filename = item.getAttribute("data-filename");
-          if (!filename) {
-            return "";
-          }
-
-          const slashIndex = filename.lastIndexOf("/");
-          const backslashIndex = filename.lastIndexOf("\\");
-          const separatorIndex = Math.max(slashIndex, backslashIndex);
-
-          return separatorIndex > -1
-            ? filename.substring(0, separatorIndex)
-            : "";
-        }
-
         function pathAt(index) {
-          return isValidIndex(index) ? getItemPath(items[index]) : "";
+          return isValidIndex(index) ? itemMeta[index].path : "";
         }
 
         // -----------------------------------------------------------------
@@ -376,30 +361,27 @@
         // -----------------------------------------------------------------
         function handleIntersections(entries) {
           entries.forEach((entry) => {
-            const { video } = getMediaElements(entry.target);
+            const index = getItemIndex(entry.target);
+            if (index === -1) {
+              return;
+            }
+
+            const { video } = itemMeta[index];
             const isVisible =
               entry.isIntersecting &&
               entry.intersectionRatio > VISIBILITY_RATIO - 0.01;
 
             if (isVisible) {
-              const newIndex = getItemIndex(entry.target);
-              if (newIndex !== -1) {
-                if (newIndex !== currentIndex) {
-                  const previousItem = currentItem;
-                  setCurrentByIndex(newIndex);
-                  updateMediaWindow(currentIndex);
+              if (index !== currentIndex) {
+                const previousIndex = currentIndex;
+                setCurrentByIndex(index);
+                updateMediaWindow(currentIndex);
 
-                  if (previousItem) {
-                    const { video: previousVideo } =
-                      getMediaElements(previousItem);
-                    applyVideoMuteState(previousVideo, false);
-                  }
-                } else {
-                  currentItem = entry.target;
-                }
+                const previousVideo = itemMeta[previousIndex]?.video;
+                applyVideoMuteState(previousVideo, false);
               }
 
-              autoplayVisibleVideo(video);
+              autoplayVisibleVideo(video, index);
               return;
             }
 
@@ -572,7 +554,7 @@
             return;
           }
 
-          const { video } = getMediaElements(currentItem);
+          const { video } = itemMeta[currentIndex];
           if (!video) {
             return;
           }
@@ -648,7 +630,12 @@
             return;
           }
 
-          const { video } = getMediaElements(currentItem);
+          const removedIndex = getItemIndex(currentItem);
+          if (removedIndex === -1) {
+            return;
+          }
+
+          const { video } = itemMeta[removedIndex];
           if (video) {
             try {
               video.pause();
@@ -656,25 +643,21 @@
             } catch (e) {}
           }
 
-          const removedItem = currentItem;
-          observer.unobserve(removedItem);
+          observer.unobserve(currentItem);
+          currentItem.remove();
 
-          const removedIndex = getItemIndex(removedItem);
-          removedItem.remove();
+          items.splice(removedIndex, 1);
+          itemMeta.splice(removedIndex, 1);
 
-          if (removedIndex !== -1) {
-            items.splice(removedIndex, 1);
+          randomPool = randomPool
+            .map((idx) => (idx > removedIndex ? idx - 1 : idx))
+            .filter((idx) => idx !== removedIndex);
 
-            randomPool = randomPool
-              .map((idx) => (idx > removedIndex ? idx - 1 : idx))
-              .filter((idx) => idx !== removedIndex);
+          navigationHistory = navigationHistory
+            .map((idx) => (idx > removedIndex ? idx - 1 : idx))
+            .filter((idx) => idx !== removedIndex);
 
-            navigationHistory = navigationHistory
-              .map((idx) => (idx > removedIndex ? idx - 1 : idx))
-              .filter((idx) => idx !== removedIndex);
-
-            rebuildItemIndexMap();
-          }
+          rebuildItemIndexMap();
 
           if (items.length === 0) {
             resetMediaWindow();
